@@ -24,10 +24,50 @@ Nano Banana 2 works best at its native resolutions. Feeding a full high-resoluti
 
 Set `aspect_ratio` to **auto** and the node detects the closest NB2 ratio automatically. The resolved ratio is exposed as an output so it can be connected directly to the Nano Banana aspect ratio input.
 
+## Upscale Service — Nano Banana or Any Dedicated Upscaler
+
+The workflow is built around Nano Banana 2, but the upscale step at the tile level is **fully interchangeable**. The four tiles output by **Tile Crop (NB2)** are standard `IMAGE` types — wire them into whatever processor you prefer, then connect the four results to **Tile Stitch (NB2)**.
+
+**Compatible upscalers:**
+- **Nano Banana 2** (Gemini) — multimodal, prompt-guided, API-based
+- **Magnific / Krea / other dedicated upscale APIs** — drop-in replacements via their respective ComfyUI nodes
+- **Local models** — Real-ESRGAN, ESRGAN, SwinIR, or any model loaded via ComfyUI's built-in upscale nodes
+- **Any node that accepts `IMAGE` and returns `IMAGE`** — the stitcher does not care what processed the tile
+
+This makes it straightforward to swap services based on budget, speed, or quality requirements without changing the crop/stitch logic.
+
+### Controlling Output Quality with a Prompt
+
+When using an AI model as the upscaler, a text prompt controls how the model interprets each tile. The included example workflow uses a **COPY MODE** prompt that instructs the model to:
+
+- Only increase pixel resolution and clarity — no new detail invented
+- Preserve the exact camera angle, subject, pose, lighting, and background
+- Treat the image as a faithful copy operation, not a creative reinterpretation
+
+Adjusting this prompt is the primary lever for quality control: a strict COPY prompt keeps output pixel-faithful, while a more open prompt lets the model add texture and sharpness at the cost of structural fidelity. Tune it to match the use case.
+
+## Example Workflow
+
+[![Watch the demo](https://img.youtube.com/vi/3A-F3N-qy1w/maxresdefault.jpg)](https://www.youtube.com/watch?v=3A-F3N-qy1w)
+
+The example workflow file `tile_upscale_nb2.json` demonstrates a complete upscale pipeline using Nano Banana 2 (Gemini 3.1 Flash Image):
+
+| Step | Node | Settings |
+|---|---|---|
+| 1 | **Load Image** | Source image to upscale |
+| 2 | **Tile Crop (NB2)** | `4:5` · `2K` · overlap `0.15` · `gpu` |
+| 3 | **ImageBatchMulti** | Pairs each tile with a reference image for fidelity anchoring |
+| 4 | **GeminiNanoBanana2** × 4 | One per tile · `4:5` · `4K` · COPY MODE prompt |
+| 5 | **Tile Stitch (NB2)** | Blends the four upscaled tiles into the final image |
+| 6 | **Save Image** | Exports the final upscaled result |
+
+The `aspect_ratio` STRING from **Tile Crop** routes through a single Reroute node into all four upscaler nodes simultaneously — the ratio is set once and propagates automatically.
+
 ## Workflow
+
 1. Connect your image to **Tile Crop (NB2)** and choose resolution and overlap.
-2. Wire the `aspect_ratio` STRING output to the Nano Banana aspect ratio input.
-3. Send each of the four tile outputs through Nano Banana for processing.
+2. Wire the `aspect_ratio` STRING output to the upscaler's aspect ratio input.
+3. Send each of the four tile outputs through your upscale service of choice.
 4. Connect the `tile_stitcher` and all four processed tiles to **Tile Stitch (NB2)**.
 5. The stitched output is your full upscaled image.
 
