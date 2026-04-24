@@ -1,0 +1,13 @@
+[project]
+name = "comfyui-tile-upscale-nb2"
+version = "1.0.0"
+description = "Tile-based upscaling nodes for ComfyUI — Nano Banana 2 compatible"
+license = { text = "Apache-2.0" }
+
+[project.urls]
+Repository = "https://github.com/amortegui84/comfyui-tile-upscale-nb2"
+
+[tool.comfy]
+PublisherId = "amortegui84"
+DisplayName = "Tile Upscale NB2"
+Icon = ""
