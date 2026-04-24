@@ -50,7 +50,9 @@ Adjusting this prompt is the primary lever for quality control: a strict COPY pr
 
 [![Watch the demo](https://img.youtube.com/vi/3A-F3N-qy1w/maxresdefault.jpg)](https://www.youtube.com/watch?v=3A-F3N-qy1w)
 
-The example workflow file `tile_upscale_nb2.json` demonstrates a complete upscale pipeline using Nano Banana 2 (Gemini 3.1 Flash Image):
+**[⬇ Download workflow JSON](https://github.com/amortegui84/comfyui-tile-upscale-nb2/raw/main/tile_upscale_nb2.json)** — drag and drop into ComfyUI.
+
+The workflow demonstrates a complete upscale pipeline using Nano Banana 2 (Gemini 3.1 Flash Image):
 
 | Step | Node | Settings |
 |---|---|---|
