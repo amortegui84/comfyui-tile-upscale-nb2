@@ -1,221 +1,698 @@
 """
-TileCropNB2 / TileStitchNB2
-Tile-based upscaling nodes for ComfyUI, compatible with Nano Banana 2 resolutions.
+ComfyUI Tile Upscale — Universal Edition v2.0
+
+Multi-model (NB2, ChatGPT-Image-2, DALL-E-3, SDXL, SD15, custom, passthrough)
+N×M grid (1×1 … 4×4), partition-of-unity smootherstep blending.
+Full backward-compatible: TileCropNB2 / TileStitchNB2 preserve v1 output positions.
+
+Bugs fixed vs first draft:
+  • TileCropNB2 output order restored (tiles_batch moved to last slot, not slot 1)
+  • _weight_1d uses multiplicative feathering → no silent overwrite for middle tiles
+  • _tile_positions always returns exactly `count` positions (fixes 3×3, 4×4)
+  • _get_target_res finds closest AR rather than blindly falling back to 1:1
+  • NanoBanana2/Tiles category preserved on legacy nodes for search compat
 """
+import math
 import torch
 import torch.nn.functional as F
+from typing import Dict, List, Tuple
 
-# ─── NB2 resolution table ─────────────────────────────────────────────────────
-NB2_RESOLUTIONS = {
-    "16:9": {"1K": (1376, 768),  "2K": (2752, 1536), "4K": (5504, 3072)},
-    "9:16": {"1K": (768, 1376),  "2K": (1536, 2752), "4K": (3072, 5504)},
-    "1:1":  {"1K": (1024, 1024), "2K": (2048, 2048), "4K": (4096, 4096)},
-    "4:5":  {"1K": (928, 1152),  "2K": (1856, 2304), "4K": (3712, 4608)},
-    "5:4":  {"1K": (1152, 928),  "2K": (2304, 1856), "4K": (4608, 3712)},
+# ─── Resolution presets ───────────────────────────────────────────────────────
+# (width, height).  All values divisible by 8 so every diffusion model accepts them.
+
+RESOLUTION_PRESETS: Dict[str, Dict] = {
+
+    # ── Nano Banana 2 ─────────────────────────────────────────────────────────
+    "NB2": {
+        "1:1":  {"1K": (1024, 1024), "2K": (2048, 2048), "4K": (4096, 4096)},
+        "16:9": {"1K": (1376, 768),  "2K": (2752, 1536), "4K": (5504, 3072)},
+        "9:16": {"1K": (768,  1376), "2K": (1536, 2752), "4K": (3072, 5504)},
+        "4:5":  {"1K": (928,  1152), "2K": (1856, 2304), "4K": (3712, 4608)},
+        "5:4":  {"1K": (1152, 928),  "2K": (2304, 1856), "4K": (4608, 3712)},
+        "3:4":  {"1K": (768,  1024), "2K": (1536, 2048), "4K": (3072, 4096)},
+        "4:3":  {"1K": (1024, 768),  "2K": (2048, 1536), "4K": (4096, 3072)},
+        "2:3":  {"1K": (832,  1216), "2K": (1664, 2432), "4K": (3328, 4864)},
+        "3:2":  {"1K": (1216, 832),  "2K": (2432, 1664), "4K": (4864, 3328)},
+        "21:9": {"1K": (1536, 640),  "2K": (3072, 1280), "4K": (6144, 2560)},
+        "9:21": {"1K": (640,  1536), "2K": (1280, 3072), "4K": (2560, 6144)},
+    },
+
+    # ── ChatGPT Image 2  (gpt-image-1 via OpenAI images/edits API) ────────────
+    # Tiles sent to this model must use one of these exact sizes.
+    "ChatGPT-Image-2": {
+        "1:1":  {"1K": (1024, 1024)},
+        "16:9": {"HD": (1536, 1024)},
+        "9:16": {"HD": (1024, 1536)},
+    },
+
+    # ── DALL-E 3 ──────────────────────────────────────────────────────────────
+    "DALL-E-3": {
+        "1:1":  {"standard": (1024, 1024)},
+        "16:9": {"standard": (1792, 1024)},
+        "9:16": {"standard": (1024, 1792)},
+    },
+
+    # ── SDXL training-bucket resolutions ──────────────────────────────────────
+    "SDXL": {
+        "1:1":  {"1K": (1024, 1024)},
+        "16:9": {"std": (1344, 768)},
+        "9:16": {"std": (768,  1344)},
+        "4:3":  {"std": (1152, 896)},
+        "3:4":  {"std": (896,  1152)},
+        "4:5":  {"std": (896,  1152)},
+        "5:4":  {"std": (1152, 896)},
+        "3:2":  {"std": (1216, 832)},
+        "2:3":  {"std": (832,  1216)},
+        "21:9": {"std": (1536, 640)},
+        "9:21": {"std": (640,  1536)},
+    },
+
+    # ── Stable Diffusion 1.5 ──────────────────────────────────────────────────
+    "SD15": {
+        "1:1":  {"512": (512, 512),  "768": (768, 768)},
+        "16:9": {"512": (768, 448),  "768": (912, 512)},
+        "9:16": {"512": (448, 768),  "768": (512, 912)},
+        "4:3":  {"512": (680, 512),  "768": (768, 576)},
+        "3:4":  {"512": (512, 680),  "768": (576, 768)},
+        "3:2":  {"512": (768, 512),  "768": (768, 512)},
+        "2:3":  {"512": (512, 768),  "768": (512, 768)},
+    },
 }
 
-_NB2_RATIOS = {ar: NB2_RESOLUTIONS[ar]["1K"][0] / NB2_RESOLUTIONS[ar]["1K"][1]
-               for ar in NB2_RESOLUTIONS}
+# Canonical w/h ratios — used for auto-detect and closest-match fallback.
+_AR_VALUES: Dict[str, float] = {
+    "1:1":  1.0,
+    "16:9": 16 / 9,
+    "9:16": 9  / 16,
+    "4:5":  4  / 5,
+    "5:4":  5  / 4,
+    "4:3":  4  / 3,
+    "3:4":  3  / 4,
+    "3:2":  3  / 2,
+    "2:3":  2  / 3,
+    "21:9": 21 / 9,
+    "9:21": 9  / 21,
+}
 
 _INTERP = {"bilinear": "bilinear", "bicubic": "bicubic", "nearest": "nearest"}
 
+GRID_OPTIONS = [
+    "1×1",
+    "1×2", "2×1",
+    "2×2",
+    "2×3", "3×2",
+    "3×3",
+    "3×4", "4×3",
+    "4×4",
+    "2×4", "4×2",
+]
+BLEND_MODES = ["smootherstep", "smoothstep", "cosine", "linear"]
 
-# ─── helpers ──────────────────────────────────────────────────────────────────
+
+# ─── Blend / ramp functions ───────────────────────────────────────────────────
+
+def _smoothstep(t: torch.Tensor) -> torch.Tensor:
+    """C1 continuous (Ken Perlin original)."""
+    return t * t * (3.0 - 2.0 * t)
+
+def _smootherstep(t: torch.Tensor) -> torch.Tensor:
+    """C2 continuous quintic — better seam suppression, recommended default."""
+    return t * t * t * (t * (t * 6.0 - 15.0) + 10.0)
+
+def _cosine_ramp(t: torch.Tensor) -> torch.Tensor:
+    return 0.5 * (1.0 - torch.cos(math.pi * t))
+
+def _linear_ramp(t: torch.Tensor) -> torch.Tensor:
+    return t
+
+_BLEND_FN = {
+    "smootherstep": _smootherstep,
+    "smoothstep":   _smoothstep,
+    "cosine":       _cosine_ramp,
+    "linear":       _linear_ramp,
+}
+
+
+# ─── Core tensor helpers ──────────────────────────────────────────────────────
+
+def _resize(img: torch.Tensor, th: int, tw: int, mode: str) -> torch.Tensor:
+    """[H, W, C]  →  [th, tw, C]"""
+    x  = img.permute(2, 0, 1).unsqueeze(0).float()
+    kw = {} if mode == "nearest" else {"align_corners": False}
+    x  = F.interpolate(x, size=(th, tw), mode=mode, **kw)
+    return x.squeeze(0).permute(1, 2, 0)
+
+
+def _weight_1d(length: int,
+               has_interior_start: bool,
+               has_interior_end: bool,
+               overlap_px: int,
+               device: torch.device,
+               blend_mode: str = "smootherstep") -> torch.Tensor:
+    """
+    1-D feather weight for one tile axis.
+
+    Logic:
+      • has_interior_start → left/top edge touches a neighbour  → ramp 0→1
+      • has_interior_end   → right/bottom edge touches a neighbour → ramp 1→0
+      • Image-boundary edges (non-interior) always get weight = 1.
+
+    Implementation: compute left-weight and right-weight independently, then
+    MULTIPLY them.  This handles the edge case where both feather zones overlap
+    (heavy overlap on a narrow tile) without silent overwrites.
+
+    Partition-of-unity property is maintained via the canvas/w_acc normalisation
+    in TileStitch, so absolute weight magnitudes don't need to be exactly 1.
+    """
+    ramp_fn = _BLEND_FN.get(blend_mode, _smootherstep)
+
+    w_left = torch.ones(length, device=device)
+    if has_interior_start and overlap_px > 0:
+        t = torch.linspace(0.0, 1.0, overlap_px, device=device)
+        w_left[:overlap_px] = ramp_fn(t)            # 0 → 1
+
+    w_right = torch.ones(length, device=device)
+    if has_interior_end and overlap_px > 0:
+        t = torch.linspace(0.0, 1.0, overlap_px, device=device)
+        w_right[length - overlap_px:] = 1.0 - ramp_fn(t)   # 1 → 0
+
+    return w_left * w_right
+
+
+# ─── Geometry helpers ─────────────────────────────────────────────────────────
 
 def _detect_ar(w: int, h: int) -> str:
-    """Pick the NB2 aspect ratio closest to the image's actual ratio."""
     r = w / h
-    return min(_NB2_RATIOS.items(), key=lambda kv: abs(kv[1] - r))[0]
+    return min(_AR_VALUES, key=lambda ar: abs(_AR_VALUES[ar] - r))
 
 
-def _tile_dims(orig_w: int, orig_h: int, nb2_w: int, nb2_h: int, overlap: float):
+def _parse_grid(grid_str: str) -> Tuple[int, int]:
+    for sep in ("×", "x", "X"):
+        if sep in grid_str:
+            a, b = grid_str.split(sep)
+            return int(a), int(b)
+    return 2, 2
+
+
+def _compute_tile_dims(orig_w: int, orig_h: int,
+                        target_w: int, target_h: int,
+                        cols: int, rows: int,
+                        overlap: float) -> Tuple[int, int]:
     """
-    Compute tile (width, height) such that:
-      1. tile_w / tile_h == nb2_w / nb2_h  → isotropic scale, NO deformation.
-      2. tile_w >= orig_w * (0.5 + overlap) AND tile_h >= orig_h * (0.5 + overlap)
-         → guaranteed overlap on both interior axes.
-      3. tile fits inside the original image.
+    Find tile_w × tile_h such that:
+      1. tile_w / tile_h  ==  target_w / target_h   (isotropic, no deformation)
+      2. N tiles across orig_w with `overlap` fraction of tile_w shared between pairs
+      3. M tiles down   orig_h with `overlap` fraction of tile_h shared between pairs
 
-    Strategy: the NB2 ratio k = nb2_w/nb2_h may differ from orig_w/orig_h.
-    We independently compute the minimum tile_w needed to satisfy each axis
-    constraint, take the maximum (so both are satisfied), then derive the
-    other dimension from k. Finally clamp to image bounds.
+    Derivation for axis X with N tiles:
+      stride = tile_w * (1 - overlap)
+      total  = tile_w + (N-1)*stride = tile_w * (1 + (N-1)*(1-overlap))  ≥  orig_w
+      → tile_w ≥ orig_w / (1 + (N-1)*(1-overlap))
     """
-    k = nb2_w / nb2_h
+    k = target_w / target_h
 
-    # Minimum tile_w to honour the overlap requirement on each axis separately
-    tw_from_x = orig_w * (0.5 + overlap)          # X axis drives tile_w directly
-    tw_from_y = orig_h * (0.5 + overlap) * k      # Y axis drives tile_h → convert to tile_w via k
+    tw_from_x = orig_w / (1.0 + (cols - 1) * (1.0 - overlap)) if cols > 1 else float(orig_w)
+    tw_from_y = (orig_h / (1.0 + (rows - 1) * (1.0 - overlap))) * k if rows > 1 else float(orig_h) * k
 
     tw = max(tw_from_x, tw_from_y)
     th = tw / k
 
-    # Clamp to image bounds while preserving the ratio
+    # Clamp to image bounds while preserving ratio
     if tw > orig_w:
-        tw = float(orig_w)
-        th = tw / k
+        tw, th = float(orig_w), float(orig_w) / k
     if th > orig_h:
-        th = float(orig_h)
-        tw = th * k
+        th, tw = float(orig_h), float(orig_h) * k
 
     return round(tw), round(th)
 
 
-def _smoothstep(t: torch.Tensor) -> torch.Tensor:
-    return t * t * (3.0 - 2.0 * t)
-
-
-def _resize(img: torch.Tensor, th: int, tw: int, mode: str) -> torch.Tensor:
-    """[H, W, C] → [th, tw, C]"""
-    x = img.permute(2, 0, 1).unsqueeze(0).float()
-    kw = {} if mode == "nearest" else {"align_corners": False}
-    x = F.interpolate(x, size=(th, tw), mode=mode, **kw)
-    return x.squeeze(0).permute(1, 2, 0)
-
-
-def _weight_1d(length: int, is_far_side: bool, overlap_px: int,
-               device: torch.device) -> torch.Tensor:
+def _tile_positions(orig_size: int, tile_size: int, count: int) -> List[int]:
     """
-    1D feather weight vector of `length` pixels.
-
-    is_far_side=False  (near / outer side — TL,BL in X; TL,TR in Y):
-        weight = 1 everywhere except the last `overlap_px` pixels which
-        feather smoothly from 1 → 0 toward the interior edge.
-    is_far_side=True   (far / outer side — TR,BR in X; BL,BR in Y):
-        first `overlap_px` pixels feather 0 → 1 from the interior edge,
-        rest = 1.
-
-    Property: smoothstep(t) + smoothstep(1-t) = 1, so paired weights for
-    any two adjacent tiles always sum to exactly 1 — no normalization needed.
-    Outer image boundaries (non-overlapping edges) always receive weight 1.
+    Returns exactly `count` evenly-distributed start positions.
+      pos[0]  = 0
+      pos[-1] = max(0, orig_size - tile_size)   ← last tile ends at orig_size
+    Always returns `count` items — even when count=1 or tile_size >= orig_size.
     """
-    w = torch.ones(length, device=device)
-    if overlap_px <= 0:
-        return w
-    t    = torch.linspace(0.0, 1.0, overlap_px, device=device)
-    ramp = _smoothstep(t)
-    if is_far_side:
-        w[:overlap_px] = ramp           # interior edge: 0 → 1
-    else:
-        w[length - overlap_px:] = 1.0 - ramp   # interior edge: 1 → 0
-    return w
+    if count == 1:
+        return [0]
+    max_start = max(0, orig_size - tile_size)
+    return [round(i * max_start / (count - 1)) for i in range(count)]
 
 
-# ─── nodes ────────────────────────────────────────────────────────────────────
-
-class TileCropNB2:
+def _get_target_res(model_preset: str, ar: str, tier: str,
+                    custom_w: int, custom_h: int) -> Tuple[int, int]:
     """
-    Splits an image into 4 overlapping tiles, each scaled to NB2 resolution
-    with NO aspect-ratio deformation.
+    Resolve (target_w, target_h) from preset + AR + tier.
+    Falls back gracefully:
+      1. Exact AR + tier match
+      2. Exact AR, different tier
+      3. Closest AR in preset (by ratio distance)
+      4. custom_w × custom_h
+    """
+    if model_preset == "custom":
+        return custom_w, custom_h
+    if model_preset == "passthrough":
+        return 0, 0          # sentinel: no scaling
 
-    Key fix vs naive approach:
-      Naive: tile_w = orig_w * 0.65, tile_h = orig_h * 0.65
-             → tile ratio = orig ratio ≠ NB2 ratio → stretch on scale.
-      Fixed: tile dimensions derived from NB2 ratio so that scaling
-             to nb2_w × nb2_h is purely isotropic.
+    preset = RESOLUTION_PRESETS.get(model_preset)
+    if not preset:
+        return custom_w, custom_h
 
-    Overlap guarantees:
-      Both interior axes always have ≥ `overlap` extension beyond the midpoint.
-      One axis will match exactly; the other gets a slightly larger overlap
-      to satisfy the NB2 ratio constraint — still seamless after stitching.
+    ar_tbl = preset.get(ar)
 
-    Example — 2712×4608 portrait → auto detects 9:16, resolution 4K:
-      NB2 target: 3072×5504, ratio k = 0.5581
-      tile_w = max(2712×0.65, 4608×0.65×k) = max(1763, 1677) = 1763
-      tile_h = 1763 / k = 3159
-      X interior overlap: (2×1763 - 2712) / 2712 = 30.0%
-      Y interior overlap: (2×3159 - 4608) / 4608 = 37.1%   ← both ≥ 15% ✓
-      Scale: 3072 / 1763 = 1.74×
-      Output canvas: 4727×8031 (preserves original 2712/4608 ratio)
+    if not ar_tbl:
+        # Find the closest aspect ratio available in this preset
+        target_ratio = _AR_VALUES.get(ar, 1.0)
+        closest_ar   = min(preset.keys(),
+                           key=lambda k: abs(_AR_VALUES.get(k, 1.0) - target_ratio))
+        ar_tbl = preset[closest_ar]
+
+    if tier in ar_tbl:
+        return ar_tbl[tier]
+    # Tier not found — return first available tier for this AR
+    return next(iter(ar_tbl.values()))
+
+
+# ─── Universal crop node ──────────────────────────────────────────────────────
+
+class TileCrop:
+    """
+    Splits an image into N×M overlapping tiles, each optionally scaled to a
+    model-specific target resolution.
+
+    Output `tiles` is an IMAGE batch of shape [N*M, H, W, C] in row-major
+    order (left→right, top→bottom).  Connect directly to any model that accepts
+    an IMAGE batch, OR use TileExtract to pull out individual tiles for
+    workflows that process one tile at a time (e.g. NB2 with a reference image).
+
+    Model presets
+    ─────────────
+    NB2            → Nano Banana 2 resolutions
+    ChatGPT-Image-2→ gpt-image-1 (1024×1024 / 1536×1024 / 1024×1536)
+    DALL-E-3       → 1024×1024 / 1792×1024 / 1024×1792
+    SDXL           → SDXL training bucket sizes
+    SD15           → SD 1.5 base resolutions
+    custom         → enter custom_w × custom_h directly
+    passthrough    → no scaling; tiles out at native crop size
+                     (for Topaz AI, SeedV2, or any local upscaler)
+
+    Grid guide
+    ──────────
+    2×2 (4 tiles)  → good for 2-4× upscale of typical images
+    3×3 (9 tiles)  → more detail coverage, larger effective upscale
+    4×4 (16 tiles) → maximum detail, high VRAM requirement
     """
 
-    CATEGORY = "NanoBanana2/Tiles"
-    RETURN_TYPES  = ("TILE_STITCHER", "IMAGE", "IMAGE", "IMAGE", "IMAGE", "STRING")
-    RETURN_NAMES  = ("tile_stitcher", "tile_tl", "tile_tr", "tile_bl", "tile_br", "aspect_ratio")
-    FUNCTION = "execute"
+    CATEGORY      = "TileUpscale"
+    RETURN_TYPES  = ("TILE_STITCHER", "IMAGE", "STRING", "STRING")
+    RETURN_NAMES  = ("tile_stitcher", "tiles", "aspect_ratio", "tile_info")
+    FUNCTION      = "execute"
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        presets = list(RESOLUTION_PRESETS.keys()) + ["custom", "passthrough"]
+        tiers   = ["1K", "2K", "4K", "HD", "standard", "std", "512", "768"]
+        ars     = ["auto"] + list(_AR_VALUES.keys())
+        return {
+            "required": {
+                "image":           ("IMAGE",),
+                "model_preset":    (presets,      {"default": "NB2"}),
+                "grid":            (GRID_OPTIONS, {"default": "2×2"}),
+                "aspect_ratio":    (ars,           {"default": "auto"}),
+                "resolution_tier": (tiers,         {"default": "2K"}),
+                "overlap":         ("FLOAT", {"default": 0.15, "min": 0.05,
+                                              "max": 0.45, "step": 0.01}),
+                "scale_algo":      (list(_INTERP), {"default": "bicubic"}),
+                "blend_mode":      (BLEND_MODES,   {"default": "smootherstep"}),
+                "device_mode":     (["gpu (much faster)", "cpu"],
+                                    {"default": "gpu (much faster)"}),
+            },
+            "optional": {
+                "custom_w": ("INT", {"default": 1024, "min": 64,
+                                     "max": 16384,    "step": 8}),
+                "custom_h": ("INT", {"default": 1024, "min": 64,
+                                     "max": 16384,    "step": 8}),
+            },
+        }
+
+    def execute(self, image, model_preset, grid, aspect_ratio, resolution_tier,
+                overlap, scale_algo, blend_mode, device_mode,
+                custom_w=1024, custom_h=1024):
+
+        use_gpu = device_mode.startswith("gpu") and torch.cuda.is_available()
+        device  = torch.device("cuda" if use_gpu else "cpu")
+        mode    = _INTERP[scale_algo]
+
+        img    = image[0].to(device)
+        orig_h, orig_w, C = img.shape
+
+        cols, rows  = _parse_grid(grid)
+        ar          = _detect_ar(orig_w, orig_h) if aspect_ratio == "auto" else aspect_ratio
+        passthrough = model_preset == "passthrough"
+        target_w, target_h = _get_target_res(model_preset, ar, resolution_tier,
+                                              custom_w, custom_h)
+
+        # ── Tile crop dimensions ──────────────────────────────────────────────
+        if passthrough:
+            # No AR constraint; guarantee coverage with ceil.
+            tw = math.ceil(orig_w / (1.0 + (cols - 1) * (1.0 - overlap))) if cols > 1 else orig_w
+            th = math.ceil(orig_h / (1.0 + (rows - 1) * (1.0 - overlap))) if rows > 1 else orig_h
+        else:
+            tw, th = _compute_tile_dims(orig_w, orig_h, target_w, target_h,
+                                         cols, rows, overlap)
+
+        xs = _tile_positions(orig_w, tw, cols)
+        ys = _tile_positions(orig_h, th, rows)
+
+        tiles_list: List[torch.Tensor] = []
+        for y0 in ys:
+            for x0 in xs:
+                crop = img[y0: y0 + th, x0: x0 + tw, :]
+                if passthrough:
+                    tile = crop.clamp(0.0, 1.0).cpu()
+                else:
+                    tile = _resize(crop, target_h, target_w, mode).clamp(0.0, 1.0).cpu()
+                tiles_list.append(tile)
+
+        tiles_batch = torch.stack(tiles_list, dim=0)   # [N*M, H, W, C]
+
+        # Compute actual overlap % for info display
+        if cols > 1 and orig_w > tw:
+            stride_x    = (orig_w - tw) / (cols - 1)
+            ov_x_pct    = (tw - stride_x) / tw * 100
+        else:
+            ov_x_pct    = 0.0
+        if rows > 1 and orig_h > th:
+            stride_y    = (orig_h - th) / (rows - 1)
+            ov_y_pct    = (th - stride_y) / th * 100
+        else:
+            ov_y_pct    = 0.0
+
+        if passthrough:
+            scale_str   = "passthrough"
+            out_res_str = f"{tw}×{th} (native)"
+        else:
+            sx          = target_w / tw  if tw  else 0
+            sy          = target_h / th  if th  else 0
+            scale_str   = f"{sx:.2f}× W / {sy:.2f}× H"
+            out_res_str = f"{target_w}×{target_h}"
+
+        info = (
+            f"Grid {cols}×{rows} | {cols * rows} tiles | AR {ar}\n"
+            f"Source {orig_w}×{orig_h} → crop {tw}×{th} → {out_res_str}\n"
+            f"Scale {scale_str} | Overlap X {ov_x_pct:.1f}% Y {ov_y_pct:.1f}%\n"
+            f"Blend {blend_mode} | Device {'CUDA' if use_gpu else 'CPU'}"
+        )
+
+        stitcher = {
+            "orig_w":     orig_w,    "orig_h":    orig_h,
+            "tile_w":     tw,        "tile_h":    th,
+            "target_w":   target_w if not passthrough else tw,
+            "target_h":   target_h if not passthrough else th,
+            "cols":       cols,      "rows":      rows,
+            "xs":         xs,        "ys":        ys,
+            "scale_algo": scale_algo,
+            "blend_mode": blend_mode,
+            "device":     "cuda" if use_gpu else "cpu",
+            "C":          C,
+            "passthrough": passthrough,
+        }
+
+        return (stitcher, tiles_batch, ar, info)
+
+
+# ─── Universal stitch node ────────────────────────────────────────────────────
+
+class TileStitch:
+    """
+    Blends N×M processed tiles back into a single upscaled image.
+
+    Resolution-agnostic: reads actual tile dimensions from the incoming batch.
+    If the model upscaled tiles 2× or 4×, the output canvas is scaled
+    proportionally — no manual scale factor required.
+
+    Uses smootherstep feathering (or whatever blend_mode the crop node stored)
+    with proper bilateral weighting for interior tiles (tiles with neighbours on
+    both sides in 3×3 / 4×4 grids).
+    """
+
+    CATEGORY      = "TileUpscale"
+    RETURN_TYPES  = ("IMAGE",)
+    RETURN_NAMES  = ("image",)
+    FUNCTION      = "execute"
 
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
+                "tile_stitcher": ("TILE_STITCHER",),
+                "tiles":         ("IMAGE",),    # [N*M, H, W, C]
+            }
+        }
+
+    def execute(self, tile_stitcher: dict, tiles: torch.Tensor):
+        s      = tile_stitcher
+        dev_s  = s["device"]
+        device = torch.device(dev_s if (dev_s == "cuda" and torch.cuda.is_available()) else "cpu")
+        mode   = _INTERP[s["scale_algo"]]
+        bmode  = s.get("blend_mode", "smootherstep")
+
+        orig_w, orig_h = s["orig_w"], s["orig_h"]
+        tile_w, tile_h = s["tile_w"], s["tile_h"]
+        cols, rows     = s["cols"],   s["rows"]
+        xs, ys         = s["xs"],     s["ys"]
+        C              = s["C"]
+
+        # Actual tile size after model processing (may be larger than crop)
+        th_proc, tw_proc = tiles.shape[1], tiles.shape[2]
+
+        # Scale factors: how much did the model upscale each tile?
+        scale_x = tw_proc / tile_w
+        scale_y = th_proc / tile_h
+        out_w   = round(orig_w * scale_x)
+        out_h   = round(orig_h * scale_y)
+
+        xs_out = [round(x * scale_x) for x in xs]
+        ys_out = [round(y * scale_y) for y in ys]
+
+        # Interior overlap in output pixels (uniform stride → same for all pairs)
+        ov_x = max(0, tw_proc - (xs_out[1] - xs_out[0])) if cols > 1 else 0
+        ov_y = max(0, th_proc - (ys_out[1] - ys_out[0])) if rows > 1 else 0
+
+        canvas = torch.zeros(out_h, out_w, C, device=device)
+        w_acc  = torch.zeros(out_h, out_w, 1, device=device)
+
+        idx = 0
+        for ri, cy in enumerate(ys_out):
+            for ci, cx in enumerate(xs_out):
+                t_img = tiles[idx].to(device).float()
+
+                # Normalise size — guards ±1-pixel rounding drift between tiles
+                if t_img.shape[0] != th_proc or t_img.shape[1] != tw_proc:
+                    t_img = _resize(t_img, th_proc, tw_proc, mode)
+
+                wx  = _weight_1d(tw_proc, ci > 0, ci < cols - 1, ov_x, device, bmode)
+                wy  = _weight_1d(th_proc, ri > 0, ri < rows - 1, ov_y, device, bmode)
+                w2d = (wy.unsqueeze(1) * wx.unsqueeze(0)).unsqueeze(-1)  # [th, tw, 1]
+
+                # Clamp paste region to canvas bounds (rounding can push 1px over)
+                x1, y1 = min(cx + tw_proc, out_w), min(cy + th_proc, out_h)
+                pw, ph = x1 - cx, y1 - cy
+
+                canvas[cy:y1, cx:x1, :] += t_img[:ph, :pw, :] * w2d[:ph, :pw, :]
+                w_acc[cy:y1,  cx:x1, :] += w2d[:ph, :pw, :]
+
+                idx += 1
+
+        result = (canvas / w_acc.clamp(min=1e-6)).clamp(0.0, 1.0)
+        return (result.unsqueeze(0).cpu(),)
+
+
+# ─── Utility nodes ────────────────────────────────────────────────────────────
+
+class TileExtract:
+    """
+    Extracts one tile from the tiles batch by 0-based index (row-major order).
+
+    Index mapping for 2×2:  0=TL  1=TR  2=BL  3=BR
+    Index mapping for 3×3:  0=TL  1=TM  2=TR  3=ML  4=MM  5=MR  6=BL  7=BM  8=BR
+
+    Connect the output to any model that processes a single image
+    (e.g. GeminiNanoBanana2 with a reference image).
+    """
+    CATEGORY      = "TileUpscale"
+    RETURN_TYPES  = ("IMAGE",)
+    RETURN_NAMES  = ("tile",)
+    FUNCTION      = "execute"
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "tiles": ("IMAGE",),
+                "index": ("INT", {"default": 0, "min": 0, "max": 63, "step": 1}),
+            }
+        }
+
+    def execute(self, tiles: torch.Tensor, index: int):
+        idx = index % tiles.shape[0]
+        return (tiles[idx: idx + 1],)        # [1, H, W, C]
+
+
+class TileCollect:
+    """
+    Collects individually processed tiles back into a batch for TileStitch.
+
+    Connect tile_0 … tile_N in row-major order matching the grid used in TileCrop.
+    For a 2×2 grid: tile_0=TL, tile_1=TR, tile_2=BL, tile_3=BR.
+    For a 3×3 grid: tile_0…tile_8 left→right, top→bottom.
+    Up to 16 tiles (4×4 grid).  Only connect the slots your grid requires.
+
+    All tiles are normalised to the size of tile_0 if they differ by a pixel.
+    """
+    CATEGORY      = "TileUpscale"
+    RETURN_TYPES  = ("IMAGE",)
+    RETURN_NAMES  = ("tiles",)
+    FUNCTION      = "execute"
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {"tile_0": ("IMAGE",)},
+            "optional": {f"tile_{i}": ("IMAGE",) for i in range(1, 16)},
+        }
+
+    def execute(self, tile_0: torch.Tensor, **kwargs):
+        collected = [tile_0]
+        for i in range(1, 16):
+            t = kwargs.get(f"tile_{i}")
+            if t is not None:
+                collected.append(t)
+
+        ref_h, ref_w = tile_0.shape[1], tile_0.shape[2]
+        out: List[torch.Tensor] = []
+        for t in collected:
+            if t.shape[1] != ref_h or t.shape[2] != ref_w:
+                t = _resize(t[0], ref_h, ref_w, "bicubic").unsqueeze(0)
+            out.append(t)
+        return (torch.cat(out, dim=0),)      # [N, H, W, C]
+
+
+class TileInfo:
+    """
+    Outputs a human-readable summary of the TILE_STITCHER for debugging.
+    Connect to a ShowText node to inspect grid geometry and scale factors.
+    """
+    CATEGORY      = "TileUpscale"
+    RETURN_TYPES  = ("STRING",)
+    RETURN_NAMES  = ("info",)
+    FUNCTION      = "execute"
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {"tile_stitcher": ("TILE_STITCHER",)}}
+
+    def execute(self, tile_stitcher: dict):
+        s    = tile_stitcher
+        cols, rows = s["cols"], s["rows"]
+        tw, th     = s["tile_w"], s["tile_h"]
+        ttw, tth   = s.get("target_w", tw), s.get("target_h", th)
+
+        if s.get("passthrough"):
+            scale_str = "passthrough (scale determined by external model)"
+        else:
+            sx = ttw / tw if tw else 0
+            sy = tth / th if th else 0
+            scale_str = f"{sx:.3f}× W  /  {sy:.3f}× H"
+
+        lines = [
+            f"Grid:        {cols}×{rows}  ({cols * rows} tiles)",
+            f"Source:      {s['orig_w']} × {s['orig_h']}",
+            f"Crop size:   {tw} × {th}",
+            f"Target size: {ttw} × {tth}",
+            f"Scale:       {scale_str}",
+            f"X positions: {s['xs']}",
+            f"Y positions: {s['ys']}",
+            f"Blend mode:  {s.get('blend_mode', 'smootherstep')}",
+            f"Device:      {s['device']}",
+        ]
+        return ("\n".join(lines),)
+
+
+# ─── Legacy NB2 nodes  (v1 backward compatibility) ────────────────────────────
+#
+# Output POSITIONS are identical to v1 — ComfyUI saves connections by index.
+# tiles_batch is appended at the END (position 6) so existing connections to
+# positions 0-5 load without any changes.
+
+class TileCropNB2:
+    """
+    2×2 NB2 tile crop — v1 compatible.
+
+    Outputs (in order):
+      0  tile_stitcher   — connect to TileStitchNB2 or TileStitch
+      1  tile_tl         — top-left  tile
+      2  tile_tr         — top-right tile
+      3  tile_bl         — bottom-left  tile
+      4  tile_br         — bottom-right tile
+      5  aspect_ratio    — detected or selected AR string
+      6  tiles_batch     — all 4 tiles as a single [4,H,W,C] batch (NEW in v2)
+
+    To access 3×3 / 4×4 grids or other model presets, use TileCrop (Universal).
+    """
+
+    CATEGORY      = "NanoBanana2/Tiles"
+    RETURN_TYPES  = ("TILE_STITCHER", "IMAGE", "IMAGE", "IMAGE", "IMAGE", "STRING", "IMAGE")
+    RETURN_NAMES  = ("tile_stitcher", "tile_tl", "tile_tr", "tile_bl", "tile_br",
+                     "aspect_ratio", "tiles_batch")
+    FUNCTION      = "execute"
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        ars = ["auto", "16:9", "9:16", "1:1", "4:5", "5:4",
+               "3:4",  "4:3",  "2:3",  "3:2", "21:9", "9:21"]
+        return {
+            "required": {
                 "image":        ("IMAGE",),
-                "aspect_ratio": (["auto", "16:9", "9:16", "1:1", "4:5", "5:4"], {"default": "auto"}),
-                "resolution":   (["1K", "2K", "4K"],              {"default": "2K"}),
-                "overlap":      ("FLOAT",  {"default": 0.15, "min": 0.05,
-                                            "max": 0.40,  "step": 0.01}),
-                "scale_algo":   (["bicubic", "bilinear", "nearest"], {"default": "bicubic"}),
-                "device_mode":  (["gpu (much faster)", "cpu"],       {"default": "gpu (much faster)"}),
+                "aspect_ratio": (ars, {"default": "auto"}),
+                "resolution":   (["1K", "2K", "4K"], {"default": "2K"}),
+                "overlap":      ("FLOAT", {"default": 0.15, "min": 0.05,
+                                           "max": 0.40,     "step": 0.01}),
+                "scale_algo":   (list(_INTERP), {"default": "bicubic"}),
+                "device_mode":  (["gpu (much faster)", "cpu"],
+                                  {"default": "gpu (much faster)"}),
             }
         }
 
     def execute(self, image, aspect_ratio, resolution, overlap, scale_algo, device_mode):
-        use_gpu = device_mode.startswith("gpu") and torch.cuda.is_available()
-        device  = torch.device("cuda" if use_gpu else "cpu")
-        mode    = _INTERP[scale_algo]
-
-        img = image[0].to(device)
-        orig_h, orig_w, C = img.shape
-
-        ar           = _detect_ar(orig_w, orig_h) if aspect_ratio == "auto" else aspect_ratio
-        nb2_w, nb2_h = NB2_RESOLUTIONS[ar][resolution]
-
-        tile_w, tile_h = _tile_dims(orig_w, orig_h, nb2_w, nb2_h, overlap)
-
-        # Top-left corner of the two right / bottom tiles
-        x1 = orig_w - tile_w
-        y1 = orig_h - tile_h
-
-        regions = {
-            "tl": (0,  0,  tile_w,  tile_h),
-            "tr": (x1, 0,  orig_w,  tile_h),
-            "bl": (0,  y1, tile_w,  orig_h),
-            "br": (x1, y1, orig_w,  orig_h),
-        }
-
-        def crop_scale(x0, cy0, x_end, y_end):
-            crop   = img[cy0:y_end, x0:x_end, :]          # [tile_h, tile_w, C]
-            scaled = _resize(crop, nb2_h, nb2_w, mode)    # [nb2_h, nb2_w, C] — isotropic
-            return scaled.clamp(0.0, 1.0).unsqueeze(0).cpu()
-
-        stitcher = {
-            "orig_w":     orig_w,  "orig_h":     orig_h,
-            "tile_w":     tile_w,  "tile_h":     tile_h,
-            "nb2_w":      nb2_w,   "nb2_h":      nb2_h,
-            "scale_algo": scale_algo,
-            "device":     "cuda" if use_gpu else "cpu",
-            "C":          C,
-        }
-
-        return (
-            stitcher,
-            crop_scale(*regions["tl"]),
-            crop_scale(*regions["tr"]),
-            crop_scale(*regions["bl"]),
-            crop_scale(*regions["br"]),
-            ar,
+        stitcher, tiles, ar, _ = TileCrop().execute(
+            image=image,
+            model_preset="NB2",
+            grid="2×2",
+            aspect_ratio=aspect_ratio,
+            resolution_tier=resolution,
+            overlap=overlap,
+            scale_algo=scale_algo,
+            blend_mode="smootherstep",
+            device_mode=device_mode,
         )
+        # Positions 0-5 match v1 exactly; tiles_batch at position 6 is new.
+        return (stitcher,
+                tiles[0:1], tiles[1:2], tiles[2:3], tiles[3:4],
+                ar, tiles)
 
 
 class TileStitchNB2:
     """
-    Blends 4 NB2-processed tiles back into a single upscaled image.
-
-    Resolution-agnostic: the actual tile dimensions are read from the incoming
-    images, so it works regardless of whether NB2 returns tiles at the same
-    resolution it received (1:1), at 2× (e.g. 2K in → 4K out), or any other
-    factor.  The output canvas is derived from orig_w/orig_h × scale.
-
-    Each tile receives a 2D smoothstep weight mask:
-      - weight = 1 on outer (image-boundary) edges — no feathering there
-      - feathers smoothly 1→0 toward each interior (shared) edge
-    Paired masks from adjacent tiles sum to exactly 1 (partition of unity),
-    so blending is seamless across both edge strips and the centre quad.
+    NB2 tile stitch — v1 compatible.
+    Accepts 4 individually-processed tiles (TL, TR, BL, BR).
+    Delegates to TileStitch for consistent blending with TileCrop.
     """
 
-    CATEGORY = "NanoBanana2/Tiles"
+    CATEGORY      = "NanoBanana2/Tiles"
     RETURN_TYPES  = ("IMAGE",)
     RETURN_NAMES  = ("image",)
-    FUNCTION = "execute"
+    FUNCTION      = "execute"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -230,76 +707,30 @@ class TileStitchNB2:
         }
 
     def execute(self, tile_stitcher, tile_tl, tile_tr, tile_bl, tile_br):
-        s      = tile_stitcher
-        dev_s  = s["device"]
-        device = torch.device(dev_s if (dev_s == "cuda" and torch.cuda.is_available()) else "cpu")
-        mode   = _INTERP[s["scale_algo"]]
-
-        orig_w, orig_h = s["orig_w"], s["orig_h"]
-        tile_w, tile_h = s["tile_w"], s["tile_h"]   # original crop size (pre-NB2)
-        C = s["C"]
-
-        # Read actual output dimensions from the processed tiles.
-        # NB2 may upscale (e.g. send 2K → receive 4K), so we cannot assume
-        # the tiles come back at the same resolution they were sent at.
-        # All four tiles must be the same size; we read from TL as reference.
-        th, tw = tile_tl.shape[1], tile_tl.shape[2]   # [B, H, W, C]
-
-        # How much did NB2 scale each tile relative to the original crop?
-        scale_x = tw / tile_w
-        scale_y = th / tile_h
-
-        # Output canvas: original image at the NB2-upscaled size.
-        # Because tile_w/tile_h == nb2_w/nb2_h (enforced in TileCropNB2),
-        # scale_x == scale_y and the original aspect ratio is preserved.
-        out_w = round(orig_w * scale_x)
-        out_h = round(orig_h * scale_y)
-
-        # Each tile lands on the canvas counting from the nearest corner.
-        # Interior overlap zones are derived from the same "border inward"
-        # logic used at crop time, but expressed in output (NB2) pixels.
-        x1_out = out_w - tw          # left edge of TR / BR
-        y1_out = out_h - th          # top  edge of BL / BR
-        ov_x   = tw - x1_out         # interior horizontal overlap band
-        ov_y   = th - y1_out         # interior vertical   overlap band
-
-        # (tile_batch, canvas_x0, canvas_y0, is_far_x, is_far_y)
-        tiles = [
-            (tile_tl, 0,      0,      False, False),
-            (tile_tr, x1_out, 0,      True,  False),
-            (tile_bl, 0,      y1_out, False, True),
-            (tile_br, x1_out, y1_out, True,  True),
-        ]
-
-        canvas = torch.zeros(out_h, out_w, C, device=device)
-        w_acc  = torch.zeros(out_h, out_w, 1, device=device)
-
-        for batch, cx, cy, far_x, far_y in tiles:
-            img = batch[0].to(device).float()
-            # Normalise to the reference size if tiles differ by a pixel
-            if img.shape[0] != th or img.shape[1] != tw:
-                img = _resize(img, th, tw, mode)
-
-            wx  = _weight_1d(tw, far_x, ov_x, device)               # [tw]
-            wy  = _weight_1d(th, far_y, ov_y, device)               # [th]
-            w2d = (wy.unsqueeze(1) * wx.unsqueeze(0)).unsqueeze(-1)  # [th, tw, 1]
-
-            canvas[cy:cy+th, cx:cx+tw, :] += img * w2d
-            w_acc[cy:cy+th, cx:cx+tw, :]  += w2d
-
-        # Weights sum to 1 by construction; clamp guards float drift at edges
-        result = (canvas / w_acc.clamp(min=1e-6)).clamp(0.0, 1.0)
-        return (result.unsqueeze(0).cpu(),)
+        tiles = torch.cat([tile_tl, tile_tr, tile_bl, tile_br], dim=0)
+        return TileStitch().execute(tile_stitcher, tiles)
 
 
-# ─── registration ─────────────────────────────────────────────────────────────
+# ─── Registration ─────────────────────────────────────────────────────────────
 
 NODE_CLASS_MAPPINGS = {
-    "TileCropNB2":   TileCropNB2,
-    "TileStitchNB2": TileStitchNB2,
+    # Universal
+    "TileCrop":        TileCrop,
+    "TileStitch":      TileStitch,
+    "TileExtract":     TileExtract,
+    "TileCollect":     TileCollect,
+    "TileInfo":        TileInfo,
+    # Legacy NB2
+    "TileCropNB2":     TileCropNB2,
+    "TileStitchNB2":   TileStitchNB2,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "TileCropNB2":   "Tile Crop (NB2)",
-    "TileStitchNB2": "Tile Stitch (NB2)",
+    "TileCrop":        "Tile Crop (Universal)",
+    "TileStitch":      "Tile Stitch (Universal)",
+    "TileExtract":     "Tile Extract",
+    "TileCollect":     "Tile Collect",
+    "TileInfo":        "Tile Info",
+    "TileCropNB2":     "Tile Crop (NB2)",
+    "TileStitchNB2":   "Tile Stitch (NB2)",
 }
