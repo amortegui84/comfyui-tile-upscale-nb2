@@ -105,6 +105,21 @@ Outputs at positions 0–5 are identical to v1. A new `tiles_batch` output is ad
 
 ---
 
+## Example Workflows
+
+Ready-to-load workflows are in the `workflows/` folder:
+
+| File | Description |
+|---|---|
+| `nb2_2x2_per_tile.json` | 2×2 per-tile skeleton — TileExtract × 4 → insert your model → TileCollect → TileStitch |
+| `universal_3x3_batch.json` | 3×3 batch skeleton — tiles batch direct to TileStitch (replace middle with batch model) |
+| `passthrough_topaz_seedv2.json` | 4×4 passthrough skeleton — for Topaz, SeedV2, or any external tool |
+| `tile_upscale_nb2.json` | Original v1 NB2 workflow (still loads unchanged with v2 nodes) |
+
+Load any `.json` via **ComfyUI → Load** (drag & drop or File > Open).
+
+---
+
 ## Workflow Patterns
 
 ### Pattern 1 — NB2 2×2 (existing workflow, no changes needed)

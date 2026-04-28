@@ -1,0 +1,226 @@
+{
+  "last_node_id": 12,
+  "last_link_id": 13,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "Note",
+      "pos": [30, 20],
+      "size": {"0": 720, "1": 110},
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {"text": "NB2 2x2  —  Per-Tile Skeleton (Universal)\n\nThis workflow splits into 4 tiles (TL / TR / BL / BR), passes them through (identity),\nthen stitches back. Works as-is as a crop+stitch test.\n\nTO USE WITH AN AI MODEL: break each TileExtract → TileCollect connection and insert your\nmodel node between them (e.g. GeminiNanoBanana2, SDXL KSampler, ChatGPT API node, etc.).\nFor NB2 with reference image: TileExtract(tile) + LoadImage(ref) → GeminiNB2 → TileCollect"},
+      "widgets_values": ["NB2 2x2  —  Per-Tile Skeleton (Universal)\n\nThis workflow splits into 4 tiles (TL / TR / BL / BR), passes them through (identity),\nthen stitches back. Works as-is as a crop+stitch test.\n\nTO USE WITH AN AI MODEL: break each TileExtract → TileCollect connection and insert your\nmodel node between them (e.g. GeminiNanoBanana2, SDXL KSampler, ChatGPT API node, etc.).\nFor NB2 with reference image: TileExtract(tile) + LoadImage(ref) → GeminiNB2 → TileCollect"]
+    },
+    {
+      "id": 2,
+      "type": "LoadImage",
+      "pos": [30, 170],
+      "size": {"0": 315, "1": 314},
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [1], "shape": 3, "slot_index": 0},
+        {"name": "MASK",  "type": "MASK",  "links": null, "shape": 3, "slot_index": 1}
+      ],
+      "properties": {"Node name for S&R": "LoadImage"},
+      "widgets_values": ["image.png", "image"]
+    },
+    {
+      "id": 3,
+      "type": "TileCrop",
+      "pos": [400, 170],
+      "size": {"0": 340, "1": 390},
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {"name": "image", "type": "IMAGE", "link": 1, "slot_index": 0}
+      ],
+      "outputs": [
+        {"name": "tile_stitcher", "type": "TILE_STITCHER", "links": [2, 13], "shape": 3, "slot_index": 0},
+        {"name": "tiles",         "type": "IMAGE",         "links": [3, 4, 5, 6], "shape": 3, "slot_index": 1},
+        {"name": "aspect_ratio",  "type": "STRING",        "links": null, "shape": 3, "slot_index": 2},
+        {"name": "tile_info",     "type": "STRING",        "links": null, "shape": 3, "slot_index": 3}
+      ],
+      "properties": {"Node name for S&R": "TileCrop"},
+      "widgets_values": ["NB2", "2×2", "auto", "2K", 0.15, "bicubic", "smootherstep", "gpu (much faster)", 1024, 1024]
+    },
+    {
+      "id": 4,
+      "type": "TileExtract",
+      "pos": [810, 50],
+      "size": {"0": 260, "1": 80},
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "title": "TileExtract  TL (idx 0)",
+      "inputs": [
+        {"name": "tiles", "type": "IMAGE", "link": 3, "slot_index": 0}
+      ],
+      "outputs": [
+        {"name": "tile", "type": "IMAGE", "links": [7], "shape": 3, "slot_index": 0}
+      ],
+      "properties": {"Node name for S&R": "TileExtract"},
+      "widgets_values": [0]
+    },
+    {
+      "id": 5,
+      "type": "TileExtract",
+      "pos": [810, 180],
+      "size": {"0": 260, "1": 80},
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "title": "TileExtract  TR (idx 1)",
+      "inputs": [
+        {"name": "tiles", "type": "IMAGE", "link": 4, "slot_index": 0}
+      ],
+      "outputs": [
+        {"name": "tile", "type": "IMAGE", "links": [8], "shape": 3, "slot_index": 0}
+      ],
+      "properties": {"Node name for S&R": "TileExtract"},
+      "widgets_values": [1]
+    },
+    {
+      "id": 6,
+      "type": "TileExtract",
+      "pos": [810, 310],
+      "size": {"0": 260, "1": 80},
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "title": "TileExtract  BL (idx 2)",
+      "inputs": [
+        {"name": "tiles", "type": "IMAGE", "link": 5, "slot_index": 0}
+      ],
+      "outputs": [
+        {"name": "tile", "type": "IMAGE", "links": [9], "shape": 3, "slot_index": 0}
+      ],
+      "properties": {"Node name for S&R": "TileExtract"},
+      "widgets_values": [2]
+    },
+    {
+      "id": 7,
+      "type": "TileExtract",
+      "pos": [810, 440],
+      "size": {"0": 260, "1": 80},
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "title": "TileExtract  BR (idx 3)",
+      "inputs": [
+        {"name": "tiles", "type": "IMAGE", "link": 6, "slot_index": 0}
+      ],
+      "outputs": [
+        {"name": "tile", "type": "IMAGE", "links": [10], "shape": 3, "slot_index": 0}
+      ],
+      "properties": {"Node name for S&R": "TileExtract"},
+      "widgets_values": [3]
+    },
+    {
+      "id": 8,
+      "type": "TileCollect",
+      "pos": [1140, 170],
+      "size": {"0": 280, "1": 220},
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {"name": "tile_0", "type": "IMAGE", "link": 7,  "slot_index": 0},
+        {"name": "tile_1", "type": "IMAGE", "link": 8,  "slot_index": 1},
+        {"name": "tile_2", "type": "IMAGE", "link": 9,  "slot_index": 2},
+        {"name": "tile_3", "type": "IMAGE", "link": 10, "slot_index": 3}
+      ],
+      "outputs": [
+        {"name": "tiles", "type": "IMAGE", "links": [11], "shape": 3, "slot_index": 0}
+      ],
+      "properties": {"Node name for S&R": "TileCollect"}
+    },
+    {
+      "id": 9,
+      "type": "TileStitch",
+      "pos": [1490, 170],
+      "size": {"0": 280, "1": 100},
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {"name": "tile_stitcher", "type": "TILE_STITCHER", "link": 2,  "slot_index": 0},
+        {"name": "tiles",         "type": "IMAGE",         "link": 11, "slot_index": 1}
+      ],
+      "outputs": [
+        {"name": "image", "type": "IMAGE", "links": [12], "shape": 3, "slot_index": 0}
+      ],
+      "properties": {"Node name for S&R": "TileStitch"}
+    },
+    {
+      "id": 10,
+      "type": "PreviewImage",
+      "pos": [1840, 170],
+      "size": {"0": 315, "1": 270},
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {"name": "images", "type": "IMAGE", "link": 12, "slot_index": 0}
+      ],
+      "outputs": [],
+      "properties": {"Node name for S&R": "PreviewImage"},
+      "widgets_values": []
+    },
+    {
+      "id": 11,
+      "type": "TileInfo",
+      "pos": [400, 610],
+      "size": {"0": 340, "1": 240},
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {"name": "tile_stitcher", "type": "TILE_STITCHER", "link": 13, "slot_index": 0}
+      ],
+      "outputs": [
+        {"name": "info", "type": "STRING", "links": null, "shape": 3, "slot_index": 0}
+      ],
+      "properties": {"Node name for S&R": "TileInfo"}
+    },
+    {
+      "id": 12,
+      "type": "Note",
+      "pos": [810, 580],
+      "size": {"0": 620, "1": 100},
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {"text": "↓  INSERT YOUR AI MODEL HERE  ↓\nDelete the 4 TileExtract→TileCollect wires.\nAdd your model between each TileExtract output and the matching TileCollect tile_N input.\nTileCollect order: tile_0=TL  tile_1=TR  tile_2=BL  tile_3=BR"},
+      "widgets_values": ["↓  INSERT YOUR AI MODEL HERE  ↓\nDelete the 4 TileExtract→TileCollect wires.\nAdd your model between each TileExtract output and the matching TileCollect tile_N input.\nTileCollect order: tile_0=TL  tile_1=TR  tile_2=BL  tile_3=BR"]
+    }
+  ],
+  "links": [
+    [1,  2, 0, 3,  0, "IMAGE"],
+    [2,  3, 0, 9,  0, "TILE_STITCHER"],
+    [3,  3, 1, 4,  0, "IMAGE"],
+    [4,  3, 1, 5,  0, "IMAGE"],
+    [5,  3, 1, 6,  0, "IMAGE"],
+    [6,  3, 1, 7,  0, "IMAGE"],
+    [7,  4, 0, 8,  0, "IMAGE"],
+    [8,  5, 0, 8,  1, "IMAGE"],
+    [9,  6, 0, 8,  2, "IMAGE"],
+    [10, 7, 0, 8,  3, "IMAGE"],
+    [11, 8, 0, 9,  1, "IMAGE"],
+    [12, 9, 0, 10, 0, "IMAGE"],
+    [13, 3, 0, 11, 0, "TILE_STITCHER"]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {"ds": {"scale": 0.75, "offset": [0, 0]}},
+  "version": 0.4
+}
