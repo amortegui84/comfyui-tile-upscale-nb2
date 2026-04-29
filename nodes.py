@@ -143,6 +143,53 @@ def _resize(img: torch.Tensor, th: int, tw: int, mode: str) -> torch.Tensor:
     return x.squeeze(0).permute(1, 2, 0)
 
 
+def _resize_mask(mask: torch.Tensor, th: int, tw: int, mode: str = "nearest") -> torch.Tensor:
+    """[B, H, W] -> [B, th, tw]"""
+    x = mask.unsqueeze(1).float()
+    kw = {} if mode == "nearest" else {"align_corners": False}
+    x = F.interpolate(x, size=(th, tw), mode=mode, **kw)
+    return x.squeeze(1)
+
+
+def _coerce_mask_batch(mask: torch.Tensor, batch_size: int, target_h: int, target_w: int) -> Tuple[torch.Tensor, str]:
+    """
+    Normalise common Comfy/Florence mask layouts to [B, H, W].
+    """
+    shape = tuple(mask.shape)
+    note = f"input mask shape {shape}"
+
+    if mask.ndim == 2:
+        out = mask.unsqueeze(0)
+    elif mask.ndim == 3:
+        if mask.shape[-1] in (1, 3, 4) and (mask.shape[0] != batch_size or mask.shape[1] != target_h):
+            out = mask[..., 0].unsqueeze(0)
+            note += " -> interpreted as [H,W,C]"
+        else:
+            out = mask
+            note += " -> interpreted as [B,H,W]"
+    elif mask.ndim == 4:
+        if mask.shape[-1] in (1, 3, 4):
+            out = mask[..., 0]
+            note += " -> interpreted as [B,H,W,C]"
+        elif mask.shape[1] in (1, 3, 4):
+            out = mask[:, 0, :, :]
+            note += " -> interpreted as [B,C,H,W]"
+        else:
+            raise ValueError(f"Unsupported MASK tensor layout: {shape}")
+    else:
+        raise ValueError(f"Unsupported MASK tensor rank: {mask.ndim}")
+
+    source_batch = out.shape[0]
+    if source_batch == 1 and batch_size > 1:
+        out = out.repeat(batch_size, 1, 1)
+        note += f" | repeated to image batch {batch_size}"
+    elif source_batch != batch_size:
+        out = out[:1].repeat(batch_size, 1, 1)
+        note += f" | batch mismatch fixed from {source_batch} to {batch_size}"
+
+    return out.float(), note
+
+
 def _weight_1d(length: int,
                has_interior_start: bool,
                has_interior_end: bool,
@@ -625,6 +672,160 @@ class TileInfo:
 # tiles_batch is appended at the END (position 6) so existing connections to
 # positions 0-5 load without any changes.
 
+class FlorenceMaskAlign:
+    """
+    Align a Florence mask to the exact image size before crop / bbox nodes use it.
+
+    Florence2 internally pads images to a square (1024×1024) before processing.
+    The output mask is in that padded-square coordinate space.  When the original
+    image is non-square, naively resizing the square mask to image dimensions
+    stretches the letterbox padding into the image area and shifts the bbox.
+
+    depad_florence=True (default) detects and removes this padding before
+    resizing, so bbox coordinates land on the correct region in the original image.
+    """
+
+    CATEGORY      = "TileUpscale"
+    RETURN_TYPES  = ("IMAGE", "MASK", "IMAGE", "INT", "INT", "INT", "INT", "STRING")
+    RETURN_NAMES  = ("image", "mask", "masked_preview", "bbox_x", "bbox_y", "bbox_w", "bbox_h", "info")
+    FUNCTION      = "execute"
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image":           ("IMAGE",),
+                "mask":            ("MASK",),
+                "resize_mode":     (["nearest", "bilinear", "bicubic"], {"default": "nearest"}),
+                "threshold":       ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "binarize":        ("BOOLEAN", {"default": True}),
+                "invert_mask":     ("BOOLEAN", {"default": False}),
+                "bbox_padding":    ("INT", {"default": 0, "min": 0, "max": 4096, "step": 1}),
+                "depad_florence":  ("BOOLEAN", {"default": True}),
+            }
+        }
+
+    def execute(self, image, mask, resize_mode, threshold, binarize, invert_mask,
+                bbox_padding, depad_florence=True):
+        if image.ndim != 4:
+            raise ValueError(f"Expected IMAGE tensor [B,H,W,C], got shape {tuple(image.shape)}")
+
+        batch_size, target_h, target_w, _ = image.shape
+        mask_batch, note = _coerce_mask_batch(mask, batch_size, target_h, target_w)
+
+        # ── Florence2 letterbox correction ────────────────────────────────────
+        # Florence2 resizes images so the longest side = its internal resolution,
+        # then pads to a square.  The output mask lives in that padded-square space.
+        # We detect this by checking: mask is approximately square AND its AR
+        # differs from the target (original image) AR.  If so, crop out the
+        # letterbox padding before resizing so the bbox lands in the right place.
+        mask_h, mask_w = mask_batch.shape[1], mask_batch.shape[2]
+        if (depad_florence
+                and (mask_h != target_h or mask_w != target_w)
+                and mask_h > 0 and mask_w > 0):
+            mask_ar   = mask_w / mask_h
+            target_ar = target_w / target_h
+            ar_diff   = abs(mask_ar - target_ar)
+            if ar_diff > 0.05 and abs(mask_ar - 1.0) < 0.05:
+                if target_ar > 1.0:
+                    # Landscape original → Florence padded top/bottom
+                    content_h = max(1, round(mask_h * target_h / target_w))
+                    pad_y     = max(0, (mask_h - content_h) // 2)
+                    content_h = min(content_h, mask_h - pad_y)
+                    mask_batch = mask_batch[:, pad_y : pad_y + content_h, :]
+                    note += (f" | Florence depad top/bottom:"
+                             f" y[{pad_y}:{pad_y+content_h}] of {mask_h}")
+                else:
+                    # Portrait original → Florence padded left/right
+                    content_w = max(1, round(mask_w * target_w / target_h))
+                    pad_x     = max(0, (mask_w - content_w) // 2)
+                    content_w = min(content_w, mask_w - pad_x)
+                    mask_batch = mask_batch[:, :, pad_x : pad_x + content_w]
+                    note += (f" | Florence depad left/right:"
+                             f" x[{pad_x}:{pad_x+content_w}] of {mask_w}")
+
+        mask_resized = _resize_mask(mask_batch, target_h, target_w, resize_mode).clamp(0.0, 1.0)
+
+        if invert_mask:
+            mask_resized = 1.0 - mask_resized
+
+        if binarize:
+            mask_resized = (mask_resized >= threshold).float()
+
+        mask_for_bbox = mask_resized[0] >= threshold if binarize else mask_resized[0] > threshold
+        coords = torch.nonzero(mask_for_bbox, as_tuple=False)
+        if coords.numel() == 0:
+            x0, y0, x1, y1 = 0, 0, target_w - 1, target_h - 1
+            bbox_note = "no active mask pixels; bbox fell back to full image"
+        else:
+            y0 = max(0, int(coords[:, 0].min().item()) - bbox_padding)
+            y1 = min(target_h - 1, int(coords[:, 0].max().item()) + bbox_padding)
+            x0 = max(0, int(coords[:, 1].min().item()) - bbox_padding)
+            x1 = min(target_w - 1, int(coords[:, 1].max().item()) + bbox_padding)
+            bbox_note = "bbox extracted from aligned mask"
+
+        bbox_w = x1 - x0 + 1
+        bbox_h = y1 - y0 + 1
+
+        preview = image * mask_resized.unsqueeze(-1)
+        info = (
+            f"Image {target_w}x{target_h} | {note}\n"
+            f"Aligned mask -> [{batch_size}, {target_h}, {target_w}] via {resize_mode}\n"
+            f"threshold={threshold:.2f} | binarize={binarize} | invert={invert_mask}\n"
+            f"BBox x={x0} y={y0} w={bbox_w} h={bbox_h} | {bbox_note}"
+        )
+        return (image, mask_resized, preview, x0, y0, bbox_w, bbox_h, info)
+
+
+class MaskBBoxCrop:
+    """
+    Crop image + mask using bbox coordinates, typically from FlorenceMaskAlign.
+    """
+
+    CATEGORY      = "TileUpscale"
+    RETURN_TYPES  = ("IMAGE", "MASK", "STRING")
+    RETURN_NAMES  = ("image", "mask", "info")
+    FUNCTION      = "execute"
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image":        ("IMAGE",),
+                "mask":         ("MASK",),
+                "bbox_x":       ("INT", {"default": 0, "min": 0, "max": 16384, "step": 1}),
+                "bbox_y":       ("INT", {"default": 0, "min": 0, "max": 16384, "step": 1}),
+                "bbox_w":       ("INT", {"default": 512, "min": 1, "max": 16384, "step": 1}),
+                "bbox_h":       ("INT", {"default": 512, "min": 1, "max": 16384, "step": 1}),
+                "extra_padding": ("INT", {"default": 0, "min": 0, "max": 4096, "step": 1}),
+            }
+        }
+
+    def execute(self, image, mask, bbox_x, bbox_y, bbox_w, bbox_h, extra_padding):
+        if image.ndim != 4:
+            raise ValueError(f"Expected IMAGE tensor [B,H,W,C], got shape {tuple(image.shape)}")
+
+        batch_size, target_h, target_w, _ = image.shape
+        mask_batch, note = _coerce_mask_batch(mask, batch_size, target_h, target_w)
+        mask_resized = _resize_mask(mask_batch, target_h, target_w, "nearest").clamp(0.0, 1.0)
+
+        x0 = max(0, bbox_x - extra_padding)
+        y0 = max(0, bbox_y - extra_padding)
+        x1 = min(target_w, bbox_x + bbox_w + extra_padding)
+        y1 = min(target_h, bbox_y + bbox_h + extra_padding)
+
+        if x1 <= x0 or y1 <= y0:
+            raise ValueError(f"Invalid bbox after padding: x={x0}:{x1}, y={y0}:{y1}")
+
+        cropped_image = image[:, y0:y1, x0:x1, :]
+        cropped_mask = mask_resized[:, y0:y1, x0:x1]
+        info = (
+            f"Crop x={x0} y={y0} w={x1 - x0} h={y1 - y0} | extra_padding={extra_padding}\n"
+            f"Source image {target_w}x{target_h} | {note}"
+        )
+        return (cropped_image, cropped_mask, info)
+
+
 class TileCropNB2:
     """
     2×2 NB2 tile crop — v1 compatible.
@@ -720,6 +921,8 @@ NODE_CLASS_MAPPINGS = {
     "TileExtract":     TileExtract,
     "TileCollect":     TileCollect,
     "TileInfo":        TileInfo,
+    "FlorenceMaskAlign": FlorenceMaskAlign,
+    "MaskBBoxCrop":    MaskBBoxCrop,
     # Legacy NB2
     "TileCropNB2":     TileCropNB2,
     "TileStitchNB2":   TileStitchNB2,
@@ -731,6 +934,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TileExtract":     "Tile Extract",
     "TileCollect":     "Tile Collect",
     "TileInfo":        "Tile Info",
+    "FlorenceMaskAlign": "Florence Mask Align",
+    "MaskBBoxCrop":    "Mask BBox Crop",
     "TileCropNB2":     "Tile Crop (NB2)",
     "TileStitchNB2":   "Tile Stitch (NB2)",
 }

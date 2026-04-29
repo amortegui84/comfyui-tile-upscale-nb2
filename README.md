@@ -27,13 +27,35 @@ Tiles overlap with smootherstep (C² quintic) feathering, so there are no visibl
 
 ## Installation
 
-1. Clone into your ComfyUI custom nodes folder:
-   ```
-   cd ComfyUI/custom_nodes
-   git clone https://github.com/amortegui84/comfyui-tile-upscale-nb2
-   ```
-2. Restart ComfyUI.
-3. Find nodes under **TileUpscale** (universal) or **NanoBanana2/Tiles** (legacy NB2).
+### Option A — ComfyUI Manager (recommended)
+Search for **comfyui-tile-upscale-nb2** in the Manager and click Install. Restart ComfyUI.
+
+### Option B — Git clone
+```bash
+cd ComfyUI/custom_nodes
+git clone https://github.com/amortegui84/comfyui-tile-upscale-nb2
+```
+
+### Updating
+```bash
+cd ComfyUI/custom_nodes/comfyui-tile-upscale-nb2
+git pull
+```
+
+Restart ComfyUI after installing or updating.
+
+Find nodes under **TileUpscale** (universal) or **NanoBanana2/Tiles** (legacy NB2).
+
+### Optional — Florence2 workflows
+Required only for `florence_kijai_mask_crop.json` and `florence_kijai_tile_upscale.json`.
+Runs fully **locally** — no API key needed.
+
+```bash
+cd ComfyUI/custom_nodes
+git clone https://github.com/kijai/ComfyUI-Florence2
+```
+
+Or search **ComfyUI-Florence2** in the Manager.
 
 ---
 
@@ -99,6 +121,45 @@ Connect output to a **ShowText** node.
 
 ---
 
+### Florence Mask Align
+Normalises a Florence-generated `MASK` so it matches the real `IMAGE` size exactly before cropping.
+
+Florence2 internally resizes images so the longest side = 1024 px, then pads them to a square.
+The output mask is in that padded-square coordinate space.  Without correction, naively resizing
+the square mask to the original image dimensions stretches the letterbox area and shifts the bbox —
+causing the crop to land at the wrong location (typically offset toward a corner or edge).
+
+`depad_florence=True` (default) detects and removes this letterbox padding before resize, so
+the bbox coordinates correctly target the segmented subject in the original image.
+
+| Parameter | Description |
+|---|---|
+| `resize_mode` | nearest (hard masks) / bilinear / bicubic |
+| `threshold` | Binarisation cutoff (default 0.5) |
+| `binarize` | Convert mask to binary 0/1 |
+| `invert_mask` | Flip mask values |
+| `bbox_padding` | Extra pixels added around the detected bbox |
+| `depad_florence` | **Remove Florence's square letterbox padding before resize** (default True) |
+
+**Outputs:**
+- `image` → passthrough original image
+- `mask` → aligned mask at the exact image size
+- `masked_preview` → image multiplied by the aligned mask (preview)
+- `bbox_x / bbox_y / bbox_w / bbox_h` → bounding box extracted from the aligned mask
+- `info` → debug summary: detected mask layout, depad action taken, final bbox (connect to ShowText)
+
+Recommended flow:
+`LoadImage → Florence2Run (kijai) → Florence Mask Align → Mask BBox Crop`
+
+---
+
+### Mask BBox Crop
+Crops the image and the aligned mask using `bbox_x / bbox_y / bbox_w / bbox_h`, typically straight from `Florence Mask Align`.
+
+Use it when you want a real cut of the detected region instead of only an aligned mask preview.
+
+---
+
 ### Tile Crop (NB2) / Tile Stitch (NB2)
 Legacy v1 nodes. **Existing workflows load without changes.**
 Outputs at positions 0–5 are identical to v1. A new `tiles_batch` output is added at position 6.
@@ -114,7 +175,8 @@ Ready-to-load workflows are in the `workflows/` folder:
 | `nb2_2x2_per_tile.json` | 2×2 per-tile skeleton — TileExtract × 4 → insert your model → TileCollect → TileStitch |
 | `universal_3x3_batch.json` | 3×3 batch skeleton — tiles batch direct to TileStitch (replace middle with batch model) |
 | `passthrough_topaz_seedv2.json` | 4×4 passthrough skeleton — for Topaz, SeedV2, or any external tool |
-| `tile_upscale_nb2.json` | Original v1 NB2 workflow (still loads unchanged with v2 nodes) |
+| `florence_kijai_mask_crop.json` | Florence2 (kijai) → aligned mask → bbox crop skeleton |
+| `florence_kijai_tile_upscale.json` | Florence2 detect subject → aligned crop → 2×2 tile upscale skeleton *(requires kijai/ComfyUI-Florence2)* |
 
 Load any `.json` via **ComfyUI → Load** (drag & drop or File > Open).
 
@@ -177,6 +239,19 @@ TileCrop (SDXL, 3×3, 1K)
   └─ tiles → SDXL KSampler (img2img, Tile ControlNet)
                └─ processed tiles → TileStitch
 ```
+
+---
+
+### Pattern 6 â€” Florence mask -> aligned crop
+If Florence returns a mask that looks shifted, tiny, or scaled wrong, insert the alignment node before any crop step:
+```
+LoadImage
+  -> image --------------------------.
+  -> Florence mask node -> Florence Mask Align -> aligned MASK
+                                            -> masked_preview
+                                            -> bbox_x/y/w/h -> Mask BBox Crop
+```
+Use `nearest` for hard segmentation masks. Raise `bbox_padding` a little if the crop feels too tight.
 
 ---
 
@@ -250,6 +325,10 @@ To upgrade a workflow to use the universal nodes:
 ---
 
 ## Changelog
+
+### v2.1.0
+- **FlorenceMaskAlign: fix Florence2 letterbox offset** — added `depad_florence` parameter (default True).  Detects and removes Florence's internal square padding before resize so bbox coordinates land on the correct region in non-square images.  Previously the crop would be offset sideways or vertically on landscape / portrait images.
+- Updated `florence_kijai_mask_crop.json` workflow with the fix enabled, plus aligned-mask preview via MaskToImage.
 
 ### v2.0.0
 - Universal `TileCrop` and `TileStitch` nodes with N×M grid support
