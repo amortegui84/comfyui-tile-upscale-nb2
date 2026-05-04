@@ -87,13 +87,13 @@ Inspect tile metadata for a specific index. Shows method, grid layout, source re
 
 Save the stitched image with embedded DPI metadata. DPI is metadata only — it does not add pixel detail.
 
+DPI options: `72` (screen/web), `150` (draft print), `300` (quality print), `600` (high-res print).
+
 | Format | DPI support |
 |---|---|
 | PNG | pHYs chunk (lossless) |
 | TIFF | Resolution tags (lossless with LZW) |
 | JPEG | APP0/JFIF fields (lossy) |
-
-Common values: 72 (screen), 150 (draft), 300 (print), 600 (high-res print).
 
 ---
 
@@ -157,9 +157,11 @@ All three workflows ship with **Tile Scale By / Placeholder (AM)** as the upscal
 
 | File | Method | Grid | Tiles | Upscaler slot |
 |---|---|---|---|---|
-| `tile_upscale_01_nb2_3x3_9_tiles.json` | `nb2` | 3×3 | 9 | 9× TileScaleByAM |
-| `tile_upscale_02_image2_4x3_12_tiles.json` | `image_2` | 4×3 | 12 | 12× TileScaleByAM |
-| `tile_upscale_03_faithful_6x3_18_tiles.json` | `topaz` | 6×3 | 18 | 18× TileScaleByAM |
+| `tile_upscale_01_nb2_2x2_4_tiles.json` | `nb2` | 2×2 | 4 | 4× TileScaleByAM |
+| `tile_upscale_02_image2_3x2_6_tiles.json` | `image_2` | 3×2 | 6 | 6× TileScaleByAM |
+| `tile_upscale_03_faithful_2x2_4_tiles.json` | `topaz` | 2×2 | 4 | 4× TileScaleByAM |
+
+Each workflow includes a preview after the crop (see all tiles) and a preview after the collect (see all upscaled tiles before stitching). To use more tiles, increase `grid_cols`/`grid_rows` in Tile Crop and add the matching Extract + ScaleBy nodes.
 
 ---
 

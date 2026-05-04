@@ -834,16 +834,12 @@ class SaveImageWithDPI:
                 "image": ("IMAGE",),
                 "filename_prefix": ("STRING", {"default": "tile_upscale"}),
                 "dpi": (
-                    "INT",
+                    ["72", "150", "300", "600"],
                     {
-                        "default": 300,
-                        "min": 1,
-                        "max": 2400,
-                        "step": 1,
+                        "default": "300",
                         "tooltip": (
                             "DPI metadata only — does not resize or add detail. "
-                            "Common values: 72 (screen), 150 (draft print), "
-                            "300 (quality print), 600 (high-res print)."
+                            "72=screen/web, 150=draft print, 300=quality print, 600=high-res print."
                         ),
                     },
                 ),
@@ -879,13 +875,14 @@ class SaveImageWithDPI:
         self,
         image: torch.Tensor,
         filename_prefix: str,
-        dpi: int,
+        dpi: str,
         format: str,
         jpeg_quality: int = 95,
         output_subfolder: str = "",
         prompt=None,
         extra_pnginfo=None,
     ):
+        dpi_val = int(dpi)
         fmt = format  # avoid shadowing the built-in
 
         # Resolve output directory — fall back gracefully if folder_paths unavailable.
@@ -918,13 +915,13 @@ class SaveImageWithDPI:
         w, h = img_pil.size
 
         if fmt == "png":
-            _write_png_dpi(path, img_pil, dpi)
+            _write_png_dpi(path, img_pil, dpi_val)
         elif fmt == "tiff":
-            img_pil.save(path, format="TIFF", dpi=(dpi, dpi), compression="lzw")
+            img_pil.save(path, format="TIFF", dpi=(dpi_val, dpi_val), compression="lzw")
         elif fmt == "jpeg":
-            img_pil.save(path, format="JPEG", quality=jpeg_quality, dpi=(dpi, dpi))
+            img_pil.save(path, format="JPEG", quality=jpeg_quality, dpi=(dpi_val, dpi_val))
 
-        print(f"[SaveImageWithDPI] {w}x{h}px @ {dpi} DPI -> {path}")
+        print(f"[SaveImageWithDPI] {w}x{h}px @ {dpi_val} DPI -> {path}")
 
         # ComfyUI preview output.
         results = [{"filename": fname, "subfolder": output_subfolder, "type": "output"}]
