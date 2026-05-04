@@ -822,8 +822,8 @@ class SaveImageWithDPI:
     """
 
     CATEGORY = "AM/TileUpscale"
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("saved_path",)
+    RETURN_TYPES = ("STRING", "STRING")
+    RETURN_NAMES = ("saved_path", "print_size_info")
     OUTPUT_NODE = True
     FUNCTION = "save_image"
 
@@ -921,11 +921,21 @@ class SaveImageWithDPI:
         elif fmt == "jpeg":
             img_pil.save(path, format="JPEG", quality=jpeg_quality, dpi=(dpi_val, dpi_val))
 
-        print(f"[SaveImageWithDPI] {w}x{h}px @ {dpi_val} DPI -> {path}")
+        # Physical print size (DPI is metadata only — pixel count is unchanged).
+        w_in = w / dpi_val
+        h_in = h / dpi_val
+        w_cm = w_in * 2.54
+        h_cm = h_in * 2.54
+        size_info = (
+            f"{w}×{h} px  |  {dpi_val} DPI\n"
+            f"Print size: {w_in:.1f}\" × {h_in:.1f}\"  ({w_cm:.1f} cm × {h_cm:.1f} cm)\n"
+            f"Saved: {path}"
+        )
+        print(f"[SaveImageWithDPI] {size_info}")
 
         # ComfyUI preview output.
         results = [{"filename": fname, "subfolder": output_subfolder, "type": "output"}]
-        return {"ui": {"images": results}, "result": (path,)}
+        return {"ui": {"images": results}, "result": (path, size_info)}
 
 
 # ── Node registration (imported by __init__.py) ────────────────────────────────
