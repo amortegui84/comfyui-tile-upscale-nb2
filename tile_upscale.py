@@ -353,6 +353,117 @@ class TileCropAM:
 
 # ── TileStitchAM ───────────────────────────────────────────────────────────────
 
+class TileExtractAM:
+    """
+    Extract a single tile from the TileCropAM batch by row-major index.
+
+    This is the bridge for one-image-per-call APIs such as NB2 or Image 2:
+    TileCropAM -> TileExtractAM(index=N) -> API/upscaler -> TileCollectAM.
+    """
+
+    CATEGORY = "AM/TileUpscale"
+    RETURN_TYPES = ("IMAGE", "INT")
+    RETURN_NAMES = ("tile", "tile_index")
+    FUNCTION = "extract"
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "tiles": ("IMAGE",),
+                "tile_index": ("INT", {"default": 0, "min": 0, "max": 255, "step": 1}),
+            },
+        }
+
+    def extract(self, tiles: torch.Tensor, tile_index: int):
+        if tiles.ndim != 4:
+            raise ValueError(f"TileExtractAM expected IMAGE batch [N,H,W,C], got {tuple(tiles.shape)}")
+        if tiles.shape[0] < 1:
+            raise ValueError("TileExtractAM received an empty tile batch")
+        idx = max(0, min(int(tile_index), tiles.shape[0] - 1))
+        return (tiles[idx: idx + 1], idx)
+
+
+class TileCollectAM:
+    """
+    Collect individually processed tiles back into one IMAGE batch.
+
+    Connect tiles in the same row-major order emitted by TileCropAM:
+    2x2 -> 0,1,2,3; 3x3 -> 0..8. All connected tiles are resized to tile_0's
+    processed size so TileStitchAM receives a valid batch tensor.
+    """
+
+    CATEGORY = "AM/TileUpscale"
+    RETURN_TYPES = ("IMAGE", "INT", "STRING")
+    RETURN_NAMES = ("tiles", "tile_count", "info")
+    FUNCTION = "collect"
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        optional = {"tile_metadata": ("STRING", {"forceInput": True})}
+        optional.update({f"tile_{i}": ("IMAGE",) for i in range(1, 256)})
+        return {
+            "required": {
+                "tile_0": ("IMAGE",),
+            },
+            "optional": optional,
+        }
+
+    def collect(self, tile_0: torch.Tensor, tile_metadata: str = "", **kwargs):
+        if tile_0.ndim != 4 or tile_0.shape[0] < 1:
+            raise ValueError(f"TileCollectAM expected tile_0 as IMAGE [B,H,W,C], got {tuple(tile_0.shape)}")
+
+        connected: list[torch.Tensor] = [tile_0[:1]]
+        missing_before_connected = False
+        seen_gap = False
+
+        for idx in range(1, 256):
+            tile = kwargs.get(f"tile_{idx}")
+            if tile is None:
+                seen_gap = True
+                continue
+            if seen_gap:
+                missing_before_connected = True
+            if tile.ndim != 4 or tile.shape[0] < 1:
+                raise ValueError(f"TileCollectAM expected tile_{idx} as IMAGE [B,H,W,C], got {tuple(tile.shape)}")
+            connected.append(tile[:1])
+
+        ref_h, ref_w = connected[0].shape[1], connected[0].shape[2]
+        normalized: list[torch.Tensor] = []
+        resized_count = 0
+        for tile in connected:
+            one = tile[0]
+            if one.shape[0] != ref_h or one.shape[1] != ref_w:
+                one = _np2t(_resize_np(_t2np(one), ref_w, ref_h))
+                resized_count += 1
+            normalized.append(one.unsqueeze(0))
+
+        expected = None
+        if tile_metadata:
+            try:
+                meta = json.loads(tile_metadata)
+                expected = len(meta.get("tiles", []))
+            except Exception:
+                expected = None
+
+        warnings: list[str] = []
+        if expected is not None and expected != len(normalized):
+            warnings.append(f"metadata expects {expected} tiles but TileCollectAM received {len(normalized)}")
+        if missing_before_connected:
+            warnings.append("non-contiguous tile inputs detected; connect tiles in row-major order without gaps")
+        if resized_count:
+            warnings.append(f"resized {resized_count} tile(s) to match tile_0 processed size")
+
+        info = {
+            "tile_count": len(normalized),
+            "expected_tile_count": expected,
+            "tile_size": {"w": ref_w, "h": ref_h},
+            "warnings": warnings,
+        }
+
+        return (torch.cat(normalized, dim=0), len(normalized), json.dumps(info, indent=2))
+
+
 class TileStitchAM:
     """
     Reconstruct a seamless image from processed tiles using method-aware blending.
@@ -757,6 +868,8 @@ class SaveImageWithDPI:
 
 NODE_CLASS_MAPPINGS: dict[str, type] = {
     "TileCropAM": TileCropAM,
+    "TileExtractAM": TileExtractAM,
+    "TileCollectAM": TileCollectAM,
     "TileStitchAM": TileStitchAM,
     "TileInfoAM": TileInfoAM,
     "SaveImageWithDPI": SaveImageWithDPI,
@@ -764,6 +877,8 @@ NODE_CLASS_MAPPINGS: dict[str, type] = {
 
 NODE_DISPLAY_NAME_MAPPINGS: dict[str, str] = {
     "TileCropAM": "Tile Crop (AM)",
+    "TileExtractAM": "Tile Extract (AM)",
+    "TileCollectAM": "Tile Collect (AM)",
     "TileStitchAM": "Tile Stitch (AM)",
     "TileInfoAM": "Tile Info / Debug (AM)",
     "SaveImageWithDPI": "Save Image With DPI (AM)",

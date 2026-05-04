@@ -32,6 +32,35 @@ Outputs:
 - `tile_metadata`: JSON metadata for stitching/debug
 - `tile_count`: total tile count
 
+### Tile Extract (AM)
+
+Extracts one tile from the batch by row-major index. Use this when the selected upscaler/API processes one image per call.
+
+Examples:
+
+- 2x2 grid: indexes `0, 1, 2, 3`
+- 3x3 grid: indexes `0, 1, 2, 3, 4, 5, 6, 7, 8`
+
+Typical regenerative API pattern:
+
+```text
+Tile Crop (AM)
+  -> Tile Extract (AM) index 0 -> NB2 / Image 2 -> Tile Collect (AM) tile_0
+  -> Tile Extract (AM) index 1 -> NB2 / Image 2 -> Tile Collect (AM) tile_1
+  -> Tile Extract (AM) index 2 -> NB2 / Image 2 -> Tile Collect (AM) tile_2
+  -> Tile Extract (AM) index 3 -> NB2 / Image 2 -> Tile Collect (AM) tile_3
+```
+
+### Tile Collect (AM)
+
+Collects processed per-tile images back into one IMAGE batch for `Tile Stitch (AM)`.
+
+Connect processed tiles in the same row-major order emitted by `Tile Crop (AM)`. The node outputs:
+
+- `tiles`: collected processed tile batch
+- `tile_count`: number of connected tiles
+- `info`: JSON summary and warnings
+
 ### Tile Stitch (AM)
 
 Stitches processed tiles back into one image. It reads the processed tile size automatically and builds the final canvas from the detected scale.
@@ -92,12 +121,28 @@ The workflow folder intentionally contains only the current method-aware tile up
 ```text
 Load Image
   -> Tile Crop (AM)
-      tiles -> upscaler node -> Tile Stitch (AM)
-      tile_metadata ---------> Tile Stitch (AM)
-      tile_metadata ---------> Tile Info / Debug (AM)
+      tiles -> batch upscaler node -> Tile Stitch (AM)
+      tile_metadata -----------> Tile Stitch (AM)
 
 Tile Stitch (AM)
   -> Preview Image
+  -> Save Image With DPI (AM)
+```
+
+For one-image-per-call methods such as NB2 or Image 2:
+
+```text
+Load Image
+  -> Tile Crop (AM)
+      tiles -> Tile Extract (AM) index 0 -> NB2/Image 2 -> Tile Collect (AM) tile_0
+      tiles -> Tile Extract (AM) index 1 -> NB2/Image 2 -> Tile Collect (AM) tile_1
+      tiles -> Tile Extract (AM) index 2 -> NB2/Image 2 -> Tile Collect (AM) tile_2
+      tiles -> Tile Extract (AM) index 3 -> NB2/Image 2 -> Tile Collect (AM) tile_3
+      tile_metadata -------------------------------> Tile Collect (AM)
+      tile_metadata -------------------------------> Tile Stitch (AM)
+
+Tile Collect (AM)
+  -> Tile Stitch (AM)
   -> Save Image With DPI (AM)
 ```
 
