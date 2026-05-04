@@ -384,6 +384,68 @@ class TileExtractAM:
         return (tiles[idx: idx + 1], idx)
 
 
+class TileScaleByAM:
+    """
+    Scale an image by a fixed factor — placeholder for a real tile upscaler.
+
+    Use this while setting up and testing workflow geometry. When the tiling and
+    stitching look correct, replace this node with your actual upscaler (Topaz,
+    SeedV2, NB2, GPT-Image-2, ESRGAN, etc.) — the rest of the workflow stays
+    identical because TileStitchAM infers the scale factor automatically from
+    the processed tile size.
+    """
+
+    CATEGORY = "AM/TileUpscale"
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("image",)
+    FUNCTION = "scale_by"
+
+    _PIL_METHODS = {
+        "lanczos": Image.LANCZOS,
+        "bicubic": Image.BICUBIC,
+        "bilinear": Image.BILINEAR,
+        "nearest": Image.NEAREST,
+    }
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "scale_factor": (
+                    "FLOAT",
+                    {
+                        "default": 2.0,
+                        "min": 0.1,
+                        "max": 16.0,
+                        "step": 0.05,
+                        "tooltip": (
+                            "Multiply width and height by this factor. "
+                            "2.0 = double resolution. Replace this node with "
+                            "your real upscaler once the workflow geometry is confirmed."
+                        ),
+                    },
+                ),
+                "upscale_method": (
+                    ["lanczos", "bicubic", "bilinear", "nearest"],
+                    {"default": "lanczos"},
+                ),
+            },
+        }
+
+    def scale_by(self, image: torch.Tensor, scale_factor: float, upscale_method: str):
+        pil_method = self._PIL_METHODS[upscale_method]
+        results: list[torch.Tensor] = []
+        for i in range(image.shape[0]):
+            np_img = _t2np(image[i])
+            H, W = np_img.shape[:2]
+            new_w = max(1, round(W * scale_factor))
+            new_h = max(1, round(H * scale_factor))
+            pil_resized = _np_to_pil(np_img).resize((new_w, new_h), pil_method)
+            results.append(_np2t(_pil_to_np(pil_resized)))
+        return (torch.stack(results, dim=0),)
+
+
 class TileCollectAM:
     """
     Collect individually processed tiles back into one IMAGE batch.
@@ -391,11 +453,15 @@ class TileCollectAM:
     Connect tiles in the same row-major order emitted by TileCropAM:
     2x2 -> 0,1,2,3; 3x3 -> 0..8. All connected tiles are resized to tile_0's
     processed size so TileStitchAM receives a valid batch tensor.
+
+    tile_metadata is passed through unchanged so TileStitchAM can be wired
+    from this node instead of directly from TileCropAM, keeping the pipeline
+    linear: CropAM -> ... -> CollectAM -> StitchAM.
     """
 
     CATEGORY = "AM/TileUpscale"
-    RETURN_TYPES = ("IMAGE", "INT", "STRING")
-    RETURN_NAMES = ("tiles", "tile_count", "info")
+    RETURN_TYPES = ("IMAGE", "INT", "STRING", "STRING")
+    RETURN_NAMES = ("tiles", "tile_count", "info", "tile_metadata")
     FUNCTION = "collect"
 
     @classmethod
@@ -461,7 +527,7 @@ class TileCollectAM:
             "warnings": warnings,
         }
 
-        return (torch.cat(normalized, dim=0), len(normalized), json.dumps(info, indent=2))
+        return (torch.cat(normalized, dim=0), len(normalized), json.dumps(info, indent=2), tile_metadata)
 
 
 class TileStitchAM:
@@ -869,6 +935,7 @@ class SaveImageWithDPI:
 NODE_CLASS_MAPPINGS: dict[str, type] = {
     "TileCropAM": TileCropAM,
     "TileExtractAM": TileExtractAM,
+    "TileScaleByAM": TileScaleByAM,
     "TileCollectAM": TileCollectAM,
     "TileStitchAM": TileStitchAM,
     "TileInfoAM": TileInfoAM,
@@ -876,10 +943,11 @@ NODE_CLASS_MAPPINGS: dict[str, type] = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS: dict[str, str] = {
-    "TileCropAM": "Tile Crop (AM)",
-    "TileExtractAM": "Tile Extract (AM)",
-    "TileCollectAM": "Tile Collect (AM)",
-    "TileStitchAM": "Tile Stitch (AM)",
+    "TileCropAM": "1. Tile Crop (AM)",
+    "TileExtractAM": "2. Tile Extract (AM)",
+    "TileScaleByAM": "3. Tile Scale By / Placeholder (AM)",
+    "TileCollectAM": "4. Tile Collect (AM)",
+    "TileStitchAM": "5. Tile Stitch (AM)",
     "TileInfoAM": "Tile Info / Debug (AM)",
     "SaveImageWithDPI": "Save Image With DPI (AM)",
 }

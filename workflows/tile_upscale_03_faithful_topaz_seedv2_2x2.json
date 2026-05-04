@@ -1,6 +1,6 @@
 {
   "id": "tile-upscale-faithful-topaz-seedv2-2x2",
-  "revision": 1,
+  "revision": 2,
   "last_node_id": 16,
   "last_link_id": 23,
   "nodes": [
@@ -8,19 +8,19 @@
       "id": 1,
       "type": "Note",
       "pos": [40, 30],
-      "size": {"0": 820, "1": 170},
+      "size": {"0": 860, "1": 180},
       "flags": {},
       "order": 0,
       "mode": 0,
       "inputs": [],
       "outputs": [],
       "properties": {},
-      "widgets_values": ["Faithful Tile Upscale - Topaz / SeedV2 - 2x2\n\nThis workflow shows the full per-tile route:\nTile Crop -> Tile Extract per tile -> upscaler per tile -> Tile Collect -> Tile Stitch -> DPI export.\n\nAs saved, each tile uses ImageScaleBy 2x as a runnable placeholder. Replace each ImageScaleBy node with Topaz, SeedV2, or another faithful upscaler."]
+      "widgets_values": ["Faithful Tile Upscale - Topaz / SeedV2 - 2x2\n\nPipeline: Tile Crop → Extract (×4) → [upscaler per tile] → Tile Collect → Tile Stitch → DPI export.\n\nAs saved, each tile uses Tile Scale By / Placeholder (AM) at 2× as a runnable stand-in.\nOnce the tiling and stitching look correct, replace each TileScaleByAM node with your\nreal upscaler (Topaz, SeedV2, ESRGAN, etc.) — the rest of the workflow stays identical.\n\ntile_metadata flows: TileCropAM → TileCollectAM (passthrough) → TileStitchAM.\nNo need to wire TileCropAM directly to TileStitchAM."]
     },
     {
       "id": 2,
       "type": "LoadImage",
-      "pos": [40, 240],
+      "pos": [40, 250],
       "size": {"0": 290, "1": 314},
       "flags": {},
       "order": 0,
@@ -36,7 +36,7 @@
     {
       "id": 3,
       "type": "TileCropAM",
-      "pos": [380, 240],
+      "pos": [380, 250],
       "size": {"0": 300, "1": 230},
       "flags": {},
       "order": 1,
@@ -44,7 +44,7 @@
       "inputs": [{"name": "image", "type": "IMAGE", "link": 1}],
       "outputs": [
         {"name": "tiles", "type": "IMAGE", "links": [2, 3, 4, 5]},
-        {"name": "tile_metadata", "type": "STRING", "links": [6, 7, 8]},
+        {"name": "tile_metadata", "type": "STRING", "links": [6, 8]},
         {"name": "tile_count", "type": "INT", "links": null}
       ],
       "properties": {"Node name for S&R": "TileCropAM"},
@@ -104,61 +104,61 @@
     },
     {
       "id": 8,
-      "type": "ImageScaleBy",
+      "type": "TileScaleByAM",
       "pos": [1040, 180],
-      "size": {"0": 260, "1": 90},
+      "size": {"0": 280, "1": 100},
       "flags": {},
       "order": 3,
       "mode": 0,
       "inputs": [{"name": "image", "type": "IMAGE", "link": 9}],
-      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [13]}],
-      "properties": {"Node name for S&R": "ImageScaleBy"},
-      "widgets_values": ["lanczos", 2.0]
+      "outputs": [{"name": "image", "type": "IMAGE", "links": [13]}],
+      "properties": {"Node name for S&R": "TileScaleByAM"},
+      "widgets_values": [2.0, "lanczos"]
     },
     {
       "id": 9,
-      "type": "ImageScaleBy",
+      "type": "TileScaleByAM",
       "pos": [1040, 300],
-      "size": {"0": 260, "1": 90},
+      "size": {"0": 280, "1": 100},
       "flags": {},
       "order": 3,
       "mode": 0,
       "inputs": [{"name": "image", "type": "IMAGE", "link": 10}],
-      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [14]}],
-      "properties": {"Node name for S&R": "ImageScaleBy"},
-      "widgets_values": ["lanczos", 2.0]
+      "outputs": [{"name": "image", "type": "IMAGE", "links": [14]}],
+      "properties": {"Node name for S&R": "TileScaleByAM"},
+      "widgets_values": [2.0, "lanczos"]
     },
     {
       "id": 10,
-      "type": "ImageScaleBy",
+      "type": "TileScaleByAM",
       "pos": [1040, 420],
-      "size": {"0": 260, "1": 90},
+      "size": {"0": 280, "1": 100},
       "flags": {},
       "order": 3,
       "mode": 0,
       "inputs": [{"name": "image", "type": "IMAGE", "link": 11}],
-      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [15]}],
-      "properties": {"Node name for S&R": "ImageScaleBy"},
-      "widgets_values": ["lanczos", 2.0]
+      "outputs": [{"name": "image", "type": "IMAGE", "links": [15]}],
+      "properties": {"Node name for S&R": "TileScaleByAM"},
+      "widgets_values": [2.0, "lanczos"]
     },
     {
       "id": 11,
-      "type": "ImageScaleBy",
+      "type": "TileScaleByAM",
       "pos": [1040, 540],
-      "size": {"0": 260, "1": 90},
+      "size": {"0": 280, "1": 100},
       "flags": {},
       "order": 3,
       "mode": 0,
       "inputs": [{"name": "image", "type": "IMAGE", "link": 12}],
-      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [16]}],
-      "properties": {"Node name for S&R": "ImageScaleBy"},
-      "widgets_values": ["lanczos", 2.0]
+      "outputs": [{"name": "image", "type": "IMAGE", "links": [16]}],
+      "properties": {"Node name for S&R": "TileScaleByAM"},
+      "widgets_values": [2.0, "lanczos"]
     },
     {
       "id": 12,
       "type": "TileCollectAM",
       "pos": [1380, 260],
-      "size": {"0": 320, "1": 260},
+      "size": {"0": 320, "1": 280},
       "flags": {},
       "order": 4,
       "mode": 0,
@@ -172,7 +172,8 @@
       "outputs": [
         {"name": "tiles", "type": "IMAGE", "links": [17]},
         {"name": "tile_count", "type": "INT", "links": null},
-        {"name": "info", "type": "STRING", "links": null}
+        {"name": "info", "type": "STRING", "links": null},
+        {"name": "tile_metadata", "type": "STRING", "links": [7]}
       ],
       "properties": {"Node name for S&R": "TileCollectAM"},
       "widgets_values": []
@@ -222,7 +223,7 @@
     {
       "id": 16,
       "type": "TileInfoAM",
-      "pos": [380, 530],
+      "pos": [380, 540],
       "size": {"0": 300, "1": 120},
       "flags": {},
       "order": 2,
@@ -248,7 +249,7 @@
     [4, 3, 0, 6, 0, "IMAGE"],
     [5, 3, 0, 7, 0, "IMAGE"],
     [6, 3, 1, 12, 1, "STRING"],
-    [7, 3, 1, 13, 1, "STRING"],
+    [7, 12, 3, 13, 1, "STRING"],
     [8, 3, 1, 16, 0, "STRING"],
     [9, 4, 0, 8, 0, "IMAGE"],
     [10, 5, 0, 9, 0, "IMAGE"],
