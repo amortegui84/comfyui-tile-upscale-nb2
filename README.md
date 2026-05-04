@@ -113,6 +113,29 @@ The `method` in Tile Crop selects blend geometry — not which upscaler to use. 
 
 ---
 
+## Upscaler Quick Reference
+
+Choose the row that matches your upscaler. All settings can be adjusted in the nodes listed in the **Where to set it** column.
+
+| Upscaler | Method | Grid | Overlap | Feather | Color match | Prompt / reference |
+|---|---|---|---|---|---|---|
+| **NB2** (Nano Banana 2) | `nb2` | 2×2 | 20% | strong | on | **Yes — required.** Connect the same text prompt to every NB2 node. Describe the subject, style, and level of detail you want. A consistent prompt across all tiles prevents content drift between them. |
+| **GPT-Image-2** | `image_2` | 2×2 | 20% | strong | on | **Yes — recommended.** Connect the same prompt to every Image-2 node. Include a description of the scene plus any style or quality keywords. You can also pass the original image as a reference input to anchor the regeneration. |
+| **Topaz** (Photo AI / Sharpen AI) | `topaz` | 2×2 | 8% | minimal | off | **No prompt.** Topaz is a faithful upscaler — it does not accept text input. If seams appear, raise overlap to 15% and switch `feather_mode_override` to `medium` in Tile Stitch. |
+| **SeedVR2** | `seedv2` | 2×3 | 10–20% | strong | on | **No prompt.** SeedVR2 was trained on video frames (landscape aspect ratio), so the 2×3 default grid produces square-ish tiles that fit the model better. Color match is on by default because SeedVR2 can introduce subtle per-tile brightness drift. If seams are still visible, raise overlap to 20%. |
+| **ESRGAN / RealESRGAN** | `topaz` or `passthrough` | 2×2 or batch | 8% | minimal | off | **No prompt.** These models accept a whole batch — you can skip Tile Extract and Tile Collect entirely and wire the tile batch directly to your ESRGAN node, then straight to Tile Stitch. |
+
+### About prompts for regenerative upscalers (NB2, GPT-Image-2)
+
+Regenerative upscalers re-draw each tile guided by your prompt. A few tips:
+
+- **Same prompt to all tiles.** Use one prompt node and wire it to every upscaler node in the workflow. Diverging prompts cause visible seams that no amount of feathering can fix.
+- **Describe the output, not the input.** Write what you want the final result to look like — `sharp portrait, fine skin texture, soft studio light` — not a description of degradation (`blurry`, `low res`).
+- **Add a reference image when available.** NB2 and GPT-Image-2 both accept an optional reference or style image. Passing the original (or a crop of it) as reference keeps the regeneration anchored to the source content.
+- **Keep style consistent.** If tiles look inconsistent in color or lighting despite a shared prompt, enable `color_match_override = on` in Tile Stitch — it normalizes each tile to match its neighbors before blending.
+
+---
+
 ## Pipeline
 
 ### Per-tile upscaler (NB2, GPT-Image-2, Topaz, etc.)
