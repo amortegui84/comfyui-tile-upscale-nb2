@@ -155,11 +155,11 @@ Load Image
 
 All three workflows ship with **Tile Scale By / Placeholder (AM)** as the upscaler. Load any of them, confirm the tiling and stitching look correct, then replace each placeholder node with your real upscaler.
 
-| File | Method | Grid | Upscaler slot |
-|---|---|---|---|
-| `tile_upscale_01_nb2_regenerative_2x2.json` | `nb2` | 2×2 | 4× TileScaleByAM |
-| `tile_upscale_02_gpt_image2_regenerative_3x3.json` | `image_2` | 3×3 | 9× TileScaleByAM |
-| `tile_upscale_03_faithful_topaz_seedv2_2x2.json` | `topaz` | 2×2 | 4× TileScaleByAM |
+| File | Method | Grid | Tiles | Upscaler slot |
+|---|---|---|---|---|
+| `tile_upscale_01_nb2_3x3_9_tiles.json` | `nb2` | 3×3 | 9 | 9× TileScaleByAM |
+| `tile_upscale_02_image2_4x3_12_tiles.json` | `image_2` | 4×3 | 12 | 12× TileScaleByAM |
+| `tile_upscale_03_faithful_6x3_18_tiles.json` | `topaz` | 6×3 | 18 | 18× TileScaleByAM |
 
 ---
 

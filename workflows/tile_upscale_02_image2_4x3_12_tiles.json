@@ -1,0 +1,1750 @@
+{
+  "id": "tile-upscale-image2-4x3-12-tiles",
+  "revision": 3,
+  "last_node_id": 33,
+  "last_link_id": 43,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "Note",
+      "pos": [
+        40,
+        30
+      ],
+      "size": {
+        "0": 880,
+        "1": 180
+      },
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "Image 2 Tile Upscale - 12 tiles\n\nGrid: 4x3 = 12 tiles.\nAll tile processing nodes are ImageScaleBy placeholders so the workflow runs immediately.\nReplace each ImageScaleBy node with NB2, Image 2, Topaz, SeedV2, or your chosen upscaler.\nKeep tile order row-major: left to right, top to bottom.\nFinal export uses Save Image With DPI (AM): 72, 150, 300, 600, or custom DPI."
+      ]
+    },
+    {
+      "id": 2,
+      "type": "Note",
+      "pos": [
+        960,
+        30
+      ],
+      "size": {
+        "0": 700,
+        "1": 180
+      },
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "Prompt to use when replacing ImageScaleBy with the regenerative API node:\n\nEnhance and upscale this tile while preserving all original content, colors, lighting, texture, perspective, and object boundaries. Do not hallucinate, add, remove, crop, or rearrange anything. Keep the result visually consistent with adjacent tiles for seamless stitching."
+      ]
+    },
+    {
+      "id": 3,
+      "type": "LoadImage",
+      "pos": [
+        40,
+        260
+      ],
+      "size": {
+        "0": 290,
+        "1": 314
+      },
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            1
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "example.png",
+        "image"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "TileCropAM",
+      "pos": [
+        380,
+        260
+      ],
+      "size": {
+        "0": 310,
+        "1": 230
+      },
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "tiles",
+          "type": "IMAGE",
+          "links": [
+            2,
+            4,
+            6,
+            8,
+            10,
+            12,
+            14,
+            16,
+            18,
+            20,
+            22,
+            24
+          ]
+        },
+        {
+          "name": "tile_metadata",
+          "type": "STRING",
+          "links": [
+            26,
+            43
+          ]
+        },
+        {
+          "name": "tile_count",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileCropAM"
+      },
+      "widgets_values": [
+        "image_2",
+        4,
+        3,
+        -1.0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": 5,
+      "type": "TileExtractAM",
+      "pos": [
+        760,
+        240
+      ],
+      "size": {
+        "0": 240,
+        "1": 90
+      },
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "tiles",
+          "type": "IMAGE",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "tile",
+          "type": "IMAGE",
+          "links": [
+            3
+          ]
+        },
+        {
+          "name": "tile_index",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileExtractAM"
+      },
+      "widgets_values": [
+        0
+      ]
+    },
+    {
+      "id": 6,
+      "type": "TileScaleByAM",
+      "pos": [
+        1060,
+        240
+      ],
+      "size": {
+        "0": 260,
+        "1": 90
+      },
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            27
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileScaleByAM"
+      },
+      "widgets_values": [
+        2.0,
+        "lanczos"
+      ]
+    },
+    {
+      "id": 7,
+      "type": "TileExtractAM",
+      "pos": [
+        760,
+        345
+      ],
+      "size": {
+        "0": 240,
+        "1": 90
+      },
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "tiles",
+          "type": "IMAGE",
+          "link": 4
+        }
+      ],
+      "outputs": [
+        {
+          "name": "tile",
+          "type": "IMAGE",
+          "links": [
+            5
+          ]
+        },
+        {
+          "name": "tile_index",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileExtractAM"
+      },
+      "widgets_values": [
+        1
+      ]
+    },
+    {
+      "id": 8,
+      "type": "TileScaleByAM",
+      "pos": [
+        1060,
+        345
+      ],
+      "size": {
+        "0": 260,
+        "1": 90
+      },
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 5
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            28
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileScaleByAM"
+      },
+      "widgets_values": [
+        2.0,
+        "lanczos"
+      ]
+    },
+    {
+      "id": 9,
+      "type": "TileExtractAM",
+      "pos": [
+        760,
+        450
+      ],
+      "size": {
+        "0": 240,
+        "1": 90
+      },
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "tiles",
+          "type": "IMAGE",
+          "link": 6
+        }
+      ],
+      "outputs": [
+        {
+          "name": "tile",
+          "type": "IMAGE",
+          "links": [
+            7
+          ]
+        },
+        {
+          "name": "tile_index",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileExtractAM"
+      },
+      "widgets_values": [
+        2
+      ]
+    },
+    {
+      "id": 10,
+      "type": "TileScaleByAM",
+      "pos": [
+        1060,
+        450
+      ],
+      "size": {
+        "0": 260,
+        "1": 90
+      },
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            29
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileScaleByAM"
+      },
+      "widgets_values": [
+        2.0,
+        "lanczos"
+      ]
+    },
+    {
+      "id": 11,
+      "type": "TileExtractAM",
+      "pos": [
+        760,
+        555
+      ],
+      "size": {
+        "0": 240,
+        "1": 90
+      },
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "tiles",
+          "type": "IMAGE",
+          "link": 8
+        }
+      ],
+      "outputs": [
+        {
+          "name": "tile",
+          "type": "IMAGE",
+          "links": [
+            9
+          ]
+        },
+        {
+          "name": "tile_index",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileExtractAM"
+      },
+      "widgets_values": [
+        3
+      ]
+    },
+    {
+      "id": 12,
+      "type": "TileScaleByAM",
+      "pos": [
+        1060,
+        555
+      ],
+      "size": {
+        "0": 260,
+        "1": 90
+      },
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 9
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            30
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileScaleByAM"
+      },
+      "widgets_values": [
+        2.0,
+        "lanczos"
+      ]
+    },
+    {
+      "id": 13,
+      "type": "TileExtractAM",
+      "pos": [
+        760,
+        660
+      ],
+      "size": {
+        "0": 240,
+        "1": 90
+      },
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "tiles",
+          "type": "IMAGE",
+          "link": 10
+        }
+      ],
+      "outputs": [
+        {
+          "name": "tile",
+          "type": "IMAGE",
+          "links": [
+            11
+          ]
+        },
+        {
+          "name": "tile_index",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileExtractAM"
+      },
+      "widgets_values": [
+        4
+      ]
+    },
+    {
+      "id": 14,
+      "type": "TileScaleByAM",
+      "pos": [
+        1060,
+        660
+      ],
+      "size": {
+        "0": 260,
+        "1": 90
+      },
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 11
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            31
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileScaleByAM"
+      },
+      "widgets_values": [
+        2.0,
+        "lanczos"
+      ]
+    },
+    {
+      "id": 15,
+      "type": "TileExtractAM",
+      "pos": [
+        760,
+        765
+      ],
+      "size": {
+        "0": 240,
+        "1": 90
+      },
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "tiles",
+          "type": "IMAGE",
+          "link": 12
+        }
+      ],
+      "outputs": [
+        {
+          "name": "tile",
+          "type": "IMAGE",
+          "links": [
+            13
+          ]
+        },
+        {
+          "name": "tile_index",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileExtractAM"
+      },
+      "widgets_values": [
+        5
+      ]
+    },
+    {
+      "id": 16,
+      "type": "TileScaleByAM",
+      "pos": [
+        1060,
+        765
+      ],
+      "size": {
+        "0": 260,
+        "1": 90
+      },
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 13
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            32
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileScaleByAM"
+      },
+      "widgets_values": [
+        2.0,
+        "lanczos"
+      ]
+    },
+    {
+      "id": 17,
+      "type": "TileExtractAM",
+      "pos": [
+        760,
+        870
+      ],
+      "size": {
+        "0": 240,
+        "1": 90
+      },
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "tiles",
+          "type": "IMAGE",
+          "link": 14
+        }
+      ],
+      "outputs": [
+        {
+          "name": "tile",
+          "type": "IMAGE",
+          "links": [
+            15
+          ]
+        },
+        {
+          "name": "tile_index",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileExtractAM"
+      },
+      "widgets_values": [
+        6
+      ]
+    },
+    {
+      "id": 18,
+      "type": "TileScaleByAM",
+      "pos": [
+        1060,
+        870
+      ],
+      "size": {
+        "0": 260,
+        "1": 90
+      },
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 15
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            33
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileScaleByAM"
+      },
+      "widgets_values": [
+        2.0,
+        "lanczos"
+      ]
+    },
+    {
+      "id": 19,
+      "type": "TileExtractAM",
+      "pos": [
+        760,
+        975
+      ],
+      "size": {
+        "0": 240,
+        "1": 90
+      },
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "tiles",
+          "type": "IMAGE",
+          "link": 16
+        }
+      ],
+      "outputs": [
+        {
+          "name": "tile",
+          "type": "IMAGE",
+          "links": [
+            17
+          ]
+        },
+        {
+          "name": "tile_index",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileExtractAM"
+      },
+      "widgets_values": [
+        7
+      ]
+    },
+    {
+      "id": 20,
+      "type": "TileScaleByAM",
+      "pos": [
+        1060,
+        975
+      ],
+      "size": {
+        "0": 260,
+        "1": 90
+      },
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 17
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            34
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileScaleByAM"
+      },
+      "widgets_values": [
+        2.0,
+        "lanczos"
+      ]
+    },
+    {
+      "id": 21,
+      "type": "TileExtractAM",
+      "pos": [
+        760,
+        1080
+      ],
+      "size": {
+        "0": 240,
+        "1": 90
+      },
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "tiles",
+          "type": "IMAGE",
+          "link": 18
+        }
+      ],
+      "outputs": [
+        {
+          "name": "tile",
+          "type": "IMAGE",
+          "links": [
+            19
+          ]
+        },
+        {
+          "name": "tile_index",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileExtractAM"
+      },
+      "widgets_values": [
+        8
+      ]
+    },
+    {
+      "id": 22,
+      "type": "TileScaleByAM",
+      "pos": [
+        1060,
+        1080
+      ],
+      "size": {
+        "0": 260,
+        "1": 90
+      },
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 19
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            35
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileScaleByAM"
+      },
+      "widgets_values": [
+        2.0,
+        "lanczos"
+      ]
+    },
+    {
+      "id": 23,
+      "type": "TileExtractAM",
+      "pos": [
+        760,
+        1185
+      ],
+      "size": {
+        "0": 240,
+        "1": 90
+      },
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "tiles",
+          "type": "IMAGE",
+          "link": 20
+        }
+      ],
+      "outputs": [
+        {
+          "name": "tile",
+          "type": "IMAGE",
+          "links": [
+            21
+          ]
+        },
+        {
+          "name": "tile_index",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileExtractAM"
+      },
+      "widgets_values": [
+        9
+      ]
+    },
+    {
+      "id": 24,
+      "type": "TileScaleByAM",
+      "pos": [
+        1060,
+        1185
+      ],
+      "size": {
+        "0": 260,
+        "1": 90
+      },
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 21
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            36
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileScaleByAM"
+      },
+      "widgets_values": [
+        2.0,
+        "lanczos"
+      ]
+    },
+    {
+      "id": 25,
+      "type": "TileExtractAM",
+      "pos": [
+        760,
+        1290
+      ],
+      "size": {
+        "0": 240,
+        "1": 90
+      },
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "tiles",
+          "type": "IMAGE",
+          "link": 22
+        }
+      ],
+      "outputs": [
+        {
+          "name": "tile",
+          "type": "IMAGE",
+          "links": [
+            23
+          ]
+        },
+        {
+          "name": "tile_index",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileExtractAM"
+      },
+      "widgets_values": [
+        10
+      ]
+    },
+    {
+      "id": 26,
+      "type": "TileScaleByAM",
+      "pos": [
+        1060,
+        1290
+      ],
+      "size": {
+        "0": 260,
+        "1": 90
+      },
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 23
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            37
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileScaleByAM"
+      },
+      "widgets_values": [
+        2.0,
+        "lanczos"
+      ]
+    },
+    {
+      "id": 27,
+      "type": "TileExtractAM",
+      "pos": [
+        760,
+        1395
+      ],
+      "size": {
+        "0": 240,
+        "1": 90
+      },
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "tiles",
+          "type": "IMAGE",
+          "link": 24
+        }
+      ],
+      "outputs": [
+        {
+          "name": "tile",
+          "type": "IMAGE",
+          "links": [
+            25
+          ]
+        },
+        {
+          "name": "tile_index",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileExtractAM"
+      },
+      "widgets_values": [
+        11
+      ]
+    },
+    {
+      "id": 28,
+      "type": "TileScaleByAM",
+      "pos": [
+        1060,
+        1395
+      ],
+      "size": {
+        "0": 260,
+        "1": 90
+      },
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 25
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            38
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileScaleByAM"
+      },
+      "widgets_values": [
+        2.0,
+        "lanczos"
+      ]
+    },
+    {
+      "id": 29,
+      "type": "TileCollectAM",
+      "pos": [
+        1400,
+        300
+      ],
+      "size": {
+        "0": 340,
+        "1": 466
+      },
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "tile_0",
+          "type": "IMAGE",
+          "link": 27
+        },
+        {
+          "name": "tile_metadata",
+          "type": "STRING",
+          "link": 26
+        },
+        {
+          "name": "tile_1",
+          "type": "IMAGE",
+          "link": 28
+        },
+        {
+          "name": "tile_2",
+          "type": "IMAGE",
+          "link": 29
+        },
+        {
+          "name": "tile_3",
+          "type": "IMAGE",
+          "link": 30
+        },
+        {
+          "name": "tile_4",
+          "type": "IMAGE",
+          "link": 31
+        },
+        {
+          "name": "tile_5",
+          "type": "IMAGE",
+          "link": 32
+        },
+        {
+          "name": "tile_6",
+          "type": "IMAGE",
+          "link": 33
+        },
+        {
+          "name": "tile_7",
+          "type": "IMAGE",
+          "link": 34
+        },
+        {
+          "name": "tile_8",
+          "type": "IMAGE",
+          "link": 35
+        },
+        {
+          "name": "tile_9",
+          "type": "IMAGE",
+          "link": 36
+        },
+        {
+          "name": "tile_10",
+          "type": "IMAGE",
+          "link": 37
+        },
+        {
+          "name": "tile_11",
+          "type": "IMAGE",
+          "link": 38
+        }
+      ],
+      "outputs": [
+        {
+          "name": "tiles",
+          "type": "IMAGE",
+          "links": [
+            39
+          ]
+        },
+        {
+          "name": "tile_count",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "name": "tile_metadata",
+          "type": "STRING",
+          "links": [
+            40
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileCollectAM"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 30,
+      "type": "TileStitchAM",
+      "pos": [
+        1810,
+        300
+      ],
+      "size": {
+        "0": 300,
+        "1": 160
+      },
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "tiles",
+          "type": "IMAGE",
+          "link": 39
+        },
+        {
+          "name": "tile_metadata",
+          "type": "STRING",
+          "link": 40
+        }
+      ],
+      "outputs": [
+        {
+          "name": "stitched_image",
+          "type": "IMAGE",
+          "links": [
+            41,
+            42
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileStitchAM"
+      },
+      "widgets_values": [
+        "auto",
+        "auto"
+      ]
+    },
+    {
+      "id": 31,
+      "type": "PreviewImage",
+      "pos": [
+        2160,
+        260
+      ],
+      "size": {
+        "0": 300,
+        "1": 260
+      },
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 41
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 32,
+      "type": "SaveImageWithDPI",
+      "pos": [
+        2160,
+        570
+      ],
+      "size": {
+        "0": 300,
+        "1": 210
+      },
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 42
+        }
+      ],
+      "outputs": [
+        {
+          "name": "saved_path",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SaveImageWithDPI"
+      },
+      "widgets_values": [
+        "image2_tile_upscale",
+        300,
+        "png",
+        95,
+        ""
+      ]
+    },
+    {
+      "id": 33,
+      "type": "TileInfoAM",
+      "pos": [
+        380,
+        540
+      ],
+      "size": {
+        "0": 310,
+        "1": 130
+      },
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "tile_metadata",
+          "type": "STRING",
+          "link": 43
+        }
+      ],
+      "outputs": [
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "name": "tile_index",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "pos_x",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "pos_y",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "tile_width",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "tile_height",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "tile_count",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileInfoAM"
+      },
+      "widgets_values": [
+        0
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      3,
+      0,
+      4,
+      0,
+      "IMAGE"
+    ],
+    [
+      2,
+      4,
+      0,
+      5,
+      0,
+      "IMAGE"
+    ],
+    [
+      3,
+      5,
+      0,
+      6,
+      0,
+      "IMAGE"
+    ],
+    [
+      4,
+      4,
+      0,
+      7,
+      0,
+      "IMAGE"
+    ],
+    [
+      5,
+      7,
+      0,
+      8,
+      0,
+      "IMAGE"
+    ],
+    [
+      6,
+      4,
+      0,
+      9,
+      0,
+      "IMAGE"
+    ],
+    [
+      7,
+      9,
+      0,
+      10,
+      0,
+      "IMAGE"
+    ],
+    [
+      8,
+      4,
+      0,
+      11,
+      0,
+      "IMAGE"
+    ],
+    [
+      9,
+      11,
+      0,
+      12,
+      0,
+      "IMAGE"
+    ],
+    [
+      10,
+      4,
+      0,
+      13,
+      0,
+      "IMAGE"
+    ],
+    [
+      11,
+      13,
+      0,
+      14,
+      0,
+      "IMAGE"
+    ],
+    [
+      12,
+      4,
+      0,
+      15,
+      0,
+      "IMAGE"
+    ],
+    [
+      13,
+      15,
+      0,
+      16,
+      0,
+      "IMAGE"
+    ],
+    [
+      14,
+      4,
+      0,
+      17,
+      0,
+      "IMAGE"
+    ],
+    [
+      15,
+      17,
+      0,
+      18,
+      0,
+      "IMAGE"
+    ],
+    [
+      16,
+      4,
+      0,
+      19,
+      0,
+      "IMAGE"
+    ],
+    [
+      17,
+      19,
+      0,
+      20,
+      0,
+      "IMAGE"
+    ],
+    [
+      18,
+      4,
+      0,
+      21,
+      0,
+      "IMAGE"
+    ],
+    [
+      19,
+      21,
+      0,
+      22,
+      0,
+      "IMAGE"
+    ],
+    [
+      20,
+      4,
+      0,
+      23,
+      0,
+      "IMAGE"
+    ],
+    [
+      21,
+      23,
+      0,
+      24,
+      0,
+      "IMAGE"
+    ],
+    [
+      22,
+      4,
+      0,
+      25,
+      0,
+      "IMAGE"
+    ],
+    [
+      23,
+      25,
+      0,
+      26,
+      0,
+      "IMAGE"
+    ],
+    [
+      24,
+      4,
+      0,
+      27,
+      0,
+      "IMAGE"
+    ],
+    [
+      25,
+      27,
+      0,
+      28,
+      0,
+      "IMAGE"
+    ],
+    [
+      26,
+      4,
+      1,
+      29,
+      1,
+      "STRING"
+    ],
+    [
+      27,
+      6,
+      0,
+      29,
+      0,
+      "IMAGE"
+    ],
+    [
+      28,
+      8,
+      0,
+      29,
+      2,
+      "IMAGE"
+    ],
+    [
+      29,
+      10,
+      0,
+      29,
+      3,
+      "IMAGE"
+    ],
+    [
+      30,
+      12,
+      0,
+      29,
+      4,
+      "IMAGE"
+    ],
+    [
+      31,
+      14,
+      0,
+      29,
+      5,
+      "IMAGE"
+    ],
+    [
+      32,
+      16,
+      0,
+      29,
+      6,
+      "IMAGE"
+    ],
+    [
+      33,
+      18,
+      0,
+      29,
+      7,
+      "IMAGE"
+    ],
+    [
+      34,
+      20,
+      0,
+      29,
+      8,
+      "IMAGE"
+    ],
+    [
+      35,
+      22,
+      0,
+      29,
+      9,
+      "IMAGE"
+    ],
+    [
+      36,
+      24,
+      0,
+      29,
+      10,
+      "IMAGE"
+    ],
+    [
+      37,
+      26,
+      0,
+      29,
+      11,
+      "IMAGE"
+    ],
+    [
+      38,
+      28,
+      0,
+      29,
+      12,
+      "IMAGE"
+    ],
+    [
+      39,
+      29,
+      0,
+      30,
+      0,
+      "IMAGE"
+    ],
+    [
+      40,
+      29,
+      3,
+      30,
+      1,
+      "STRING"
+    ],
+    [
+      41,
+      30,
+      0,
+      31,
+      0,
+      "IMAGE"
+    ],
+    [
+      42,
+      30,
+      0,
+      32,
+      0,
+      "IMAGE"
+    ],
+    [
+      43,
+      4,
+      1,
+      33,
+      0,
+      "STRING"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {},
+  "version": 0.4
+}
