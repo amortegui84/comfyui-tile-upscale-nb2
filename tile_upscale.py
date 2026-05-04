@@ -77,6 +77,7 @@ METHOD_PRESETS: dict[str, dict] = {
 # Higher power = sharper transition concentrated near the boundary center.
 # Lower power (1.0 = linear) = softer, wider transition.
 _FEATHER_POWER = {"strong": 1.0, "medium": 2.0, "minimal": 4.0}
+MAX_COLLECT_TILES = 24
 
 
 # ── Image helpers ──────────────────────────────────────────────────────────────
@@ -401,7 +402,7 @@ class TileCollectAM:
     @classmethod
     def INPUT_TYPES(cls):
         optional = {"tile_metadata": ("STRING", {"forceInput": True})}
-        optional.update({f"tile_{i}": ("IMAGE",) for i in range(1, 256)})
+        optional.update({f"tile_{i}": ("IMAGE",) for i in range(1, MAX_COLLECT_TILES)})
         return {
             "required": {
                 "tile_0": ("IMAGE",),
@@ -417,7 +418,7 @@ class TileCollectAM:
         missing_before_connected = False
         seen_gap = False
 
-        for idx in range(1, 256):
+        for idx in range(1, MAX_COLLECT_TILES):
             tile = kwargs.get(f"tile_{idx}")
             if tile is None:
                 seen_gap = True

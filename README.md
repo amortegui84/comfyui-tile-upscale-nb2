@@ -61,6 +61,8 @@ Connect processed tiles in the same row-major order emitted by `Tile Crop (AM)`.
 - `tile_count`: number of connected tiles
 - `info`: JSON summary and warnings
 
+`Tile Collect (AM)` supports up to 24 tiles, enough for common grids such as 2x2, 3x3, 4x3, 4x4, and 6x4.
+
 ### Tile Stitch (AM)
 
 Stitches processed tiles back into one image. It reads the processed tile size automatically and builds the final canvas from the detected scale.
@@ -110,11 +112,13 @@ DPI is metadata only. It changes the intended physical display/print size, not t
 
 Current method-aware workflows:
 
-- `workflows/tile_upscale_01_nb2_regenerative_2x2.json`
-- `workflows/tile_upscale_02_gpt_image2_regenerative_3x3.json`
-- `workflows/tile_upscale_03_faithful_topaz_seedv2_2x2.json`
+- `workflows/tile_upscale_01_nb2_3x3_9_tiles.json`
+- `workflows/tile_upscale_02_image2_4x3_12_tiles.json`
+- `workflows/tile_upscale_03_faithful_6x3_18_tiles.json`
 
 The workflow folder intentionally contains only the current method-aware tile upscale examples.
+
+All three workflows use `ImageScaleBy` as a runnable placeholder after each `Tile Extract (AM)`. Replace those placeholder upscaler nodes with NB2, Image 2, Topaz, SeedV2, or another tile processor.
 
 ## Basic Pipeline
 
