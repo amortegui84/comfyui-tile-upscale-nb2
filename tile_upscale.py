@@ -29,6 +29,8 @@ METHOD_PRESETS: dict[str, dict] = {
         "recommended_overlap_pct": 20.0,
         "feather_mode": "strong",
         "color_match": True,
+        "recommended_cols": 2,
+        "recommended_rows": 2,
         "description": "Nano Banana 2 — generative reinterpretation, strong blending",
     },
     "image_2": {
@@ -37,6 +39,8 @@ METHOD_PRESETS: dict[str, dict] = {
         "recommended_overlap_pct": 20.0,
         "feather_mode": "strong",
         "color_match": True,
+        "recommended_cols": 2,
+        "recommended_rows": 2,
         "description": "GPT Image 2 — generative reinterpretation, strong blending",
     },
     "topaz": {
@@ -45,15 +49,19 @@ METHOD_PRESETS: dict[str, dict] = {
         "recommended_overlap_pct": 8.0,
         "feather_mode": "minimal",
         "color_match": False,
+        "recommended_cols": 2,
+        "recommended_rows": 2,
         "description": "Topaz-style faithful upscale — minimal blending, preserve structure",
     },
     "seedv2": {
         "category": "faithful",
         "changes_content": False,
         "recommended_overlap_pct": 10.0,
-        "feather_mode": "minimal",
-        "color_match": False,
-        "description": "SeedV2-style faithful upscale — minimal blending, preserve structure",
+        "feather_mode": "strong",
+        "color_match": True,
+        "recommended_cols": 2,
+        "recommended_rows": 3,
+        "description": "SeedV2-style faithful upscale — square-ish tiles, color match on",
     },
     "passthrough": {
         "category": "passthrough",
@@ -61,6 +69,8 @@ METHOD_PRESETS: dict[str, dict] = {
         "recommended_overlap_pct": 4.0,
         "feather_mode": "minimal",
         "color_match": False,
+        "recommended_cols": 2,
+        "recommended_rows": 2,
         "description": "Passthrough / external upscale — exact alignment, near-zero blending",
     },
     "custom": {
@@ -69,8 +79,24 @@ METHOD_PRESETS: dict[str, dict] = {
         "recommended_overlap_pct": 12.0,
         "feather_mode": "medium",
         "color_match": False,
+        "recommended_cols": 2,
+        "recommended_rows": 2,
         "description": "Custom — user controls all parameters",
     },
+}
+
+# Grid presets: label → (cols, rows).  "method default" resolved at runtime from METHOD_PRESETS.
+GRID_PRESETS: dict[str, tuple[int, int] | None] = {
+    "method default": None,
+    "2×2": (2, 2),
+    "2×3 — portrait tiles": (2, 3),
+    "3×2 — landscape tiles": (3, 2),
+    "3×3": (3, 3),
+    "4×2": (4, 2),
+    "2×4": (2, 4),
+    "4×3": (4, 3),
+    "3×4": (3, 4),
+    "manual": None,
 }
 
 # Smoothstep power per feather mode.
@@ -214,8 +240,21 @@ class TileCropAM:
             "required": {
                 "image": ("IMAGE",),
                 "method": (list(METHOD_PRESETS.keys()), {"default": "nb2"}),
-                "grid_cols": ("INT", {"default": 2, "min": 1, "max": 16, "step": 1}),
-                "grid_rows": ("INT", {"default": 2, "min": 1, "max": 16, "step": 1}),
+                "grid_preset": (
+                    list(GRID_PRESETS.keys()),
+                    {
+                        "default": "method default",
+                        "tooltip": (
+                            "'method default' uses the recommended grid for the selected method. "
+                            "'manual' uses the grid_cols / grid_rows values below. "
+                            "Any other preset overrides grid_cols / grid_rows."
+                        ),
+                    },
+                ),
+                "grid_cols": ("INT", {"default": 2, "min": 1, "max": 16, "step": 1,
+                                      "tooltip": "Active only when grid_preset = manual."}),
+                "grid_rows": ("INT", {"default": 2, "min": 1, "max": 16, "step": 1,
+                                      "tooltip": "Active only when grid_preset = manual."}),
                 "overlap_percent": (
                     "FLOAT",
                     {
@@ -257,6 +296,7 @@ class TileCropAM:
         self,
         image: torch.Tensor,
         method: str,
+        grid_preset: str,
         grid_cols: int,
         grid_rows: int,
         overlap_percent: float,
@@ -270,6 +310,15 @@ class TileCropAM:
         src_h, src_w = src_np.shape[:2]
 
         preset = METHOD_PRESETS[method]
+
+        # Resolve grid dimensions from preset or manual override.
+        if grid_preset == "method default":
+            grid_cols = preset["recommended_cols"]
+            grid_rows = preset["recommended_rows"]
+        elif grid_preset != "manual":
+            gc, gr = GRID_PRESETS[grid_preset]
+            grid_cols, grid_rows = gc, gr
+
         eff_overlap = overlap_percent if overlap_percent >= 0.0 else preset["recommended_overlap_pct"]
 
         # Base tile size (integer division — image need not divide evenly).

@@ -25,7 +25,8 @@ Splits the source image into a row-major IMAGE batch and emits JSON metadata tha
 |---|---|
 | `image` | Source image |
 | `method` | Blend preset: `nb2`, `image_2`, `topaz`, `seedv2`, `passthrough`, `custom` |
-| `grid_cols`, `grid_rows` | Tile grid dimensions |
+| `grid_preset` | `method default` auto-selects the recommended grid for the chosen method. Pick any fixed preset (e.g. `2×3 — portrait tiles`) to override, or `manual` to use `grid_cols`/`grid_rows` directly. |
+| `grid_cols`, `grid_rows` | Active only when `grid_preset = manual` |
 | `overlap_percent` | `-1` uses the method preset default |
 | `target_tile_width/height` | Optional: force a uniform output tile size |
 
@@ -101,14 +102,14 @@ DPI options: `72` (screen/web), `150` (draft print), `300` (quality print), `600
 
 The `method` in Tile Crop selects blend geometry — not which upscaler to use. The upscaler is whatever node you place between Tile Extract and Tile Collect.
 
-| Method | Category | Preset overlap | Stitch behavior |
-|---|---|---|---|
-| `nb2` | regenerative | 20% | strong feather, color match |
-| `image_2` | regenerative | 20% | strong feather, color match |
-| `topaz` | faithful | 8% | minimal feather, no color match |
-| `seedv2` | faithful | 10% | minimal feather, no color match |
-| `passthrough` | passthrough | 4% | near-exact placement |
-| `custom` | custom | 12% | medium feather, user-controlled |
+| Method | Category | Preset overlap | Default grid | Stitch behavior |
+|---|---|---|---|---|
+| `nb2` | regenerative | 20% | 2×2 | strong feather, color match |
+| `image_2` | regenerative | 20% | 2×2 | strong feather, color match |
+| `topaz` | faithful | 8% | 2×2 | minimal feather, no color match |
+| `seedv2` | faithful | 10% | 2×3 | strong feather, color match — square-ish tiles suit the model |
+| `passthrough` | passthrough | 4% | 2×2 | near-exact placement |
+| `custom` | custom | 12% | 2×2 | medium feather, user-controlled |
 
 ---
 

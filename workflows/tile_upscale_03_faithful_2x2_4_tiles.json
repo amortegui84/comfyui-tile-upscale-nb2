@@ -1,6 +1,6 @@
 {
   "id": "tile-upscale-topaz-2x2",
-  "revision": 2,
+  "revision": 1,
   "last_node_id": 18,
   "last_link_id": 21,
   "nodes": [
@@ -22,7 +22,7 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "Faithful Tile Upscale - Topaz / SeedV2 2x2 (4 tiles)\n\nPipeline: Tile Crop -> preview tiles -> Extract (x4) -> Scale By Placeholder (x4) -> Tile Collect -> preview upscaled -> Tile Stitch -> preview + Save.\n\nReplace each Tile Scale By / Placeholder with Topaz, SeedV2, ESRGAN, or another faithful upscaler.\ntile_metadata flows linearly: TileCropAM -> TileCollectAM (passthrough) -> TileStitchAM.\nTo increase tiles: change grid_cols/grid_rows in Tile Crop and add matching Extract + ScaleBy nodes."
+        "Faithful Tile Upscale - Topaz / SeedV2 2x2 (4 tiles)\n\nPipeline: Tile Crop -> preview tiles -> Extract (x4) -> Scale By Placeholder (x4) -> Tile Collect -> preview upscaled -> Tile Stitch -> preview + Save + print size.\n\nReplace each Tile Scale By / Placeholder with Topaz, SeedV2, ESRGAN, or another faithful upscaler.\ntile_metadata flows linearly: TileCropAM -> TileCollectAM (passthrough) -> TileStitchAM.\nFor SeedVR2: change method to 'seedv2' \u2014 grid_preset 'method default' will switch to 2x3 (square-ish tiles)."
       ]
     },
     {
@@ -71,7 +71,7 @@
       ],
       "size": {
         "0": 310,
-        "1": 230
+        "1": 250
       },
       "flags": {},
       "order": 1,
@@ -113,6 +113,7 @@
       },
       "widgets_values": [
         "topaz",
+        "method default",
         2,
         2,
         -1.0,
@@ -125,7 +126,7 @@
       "type": "PreviewImage",
       "pos": [
         380,
-        520
+        540
       ],
       "size": {
         "0": 310,
@@ -689,7 +690,7 @@
       "type": "ShowTextAM",
       "pos": [
         2110,
-        850
+        870
       ],
       "size": {
         "0": 310,

@@ -1,6 +1,6 @@
 {
   "id": "tile-upscale-nb2-2x2",
-  "revision": 2,
+  "revision": 1,
   "last_node_id": 18,
   "last_link_id": 21,
   "nodes": [
@@ -22,7 +22,7 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "NB2 Tile Upscale - Regenerative 2x2 (4 tiles)\n\nPipeline: Tile Crop -> preview tiles -> Extract (x4) -> Scale By Placeholder (x4) -> Tile Collect -> preview upscaled -> Tile Stitch -> preview + Save.\n\nReplace each Tile Scale By / Placeholder with your NB2 or GPT-Image-2 upscaler node.\ntile_metadata flows linearly: TileCropAM -> TileCollectAM (passthrough) -> TileStitchAM.\nTo use more tiles: change grid_cols/grid_rows in Tile Crop and add matching Extract + ScaleBy nodes."
+        "NB2 Tile Upscale - Regenerative 2x2 (4 tiles)\n\nPipeline: Tile Crop -> preview tiles -> Extract (x4) -> Scale By Placeholder (x4) -> Tile Collect -> preview upscaled -> Tile Stitch -> preview + Save + print size.\n\nReplace each Tile Scale By / Placeholder with your NB2 or GPT-Image-2 upscaler node.\ntile_metadata flows linearly: TileCropAM -> TileCollectAM (passthrough) -> TileStitchAM.\nGrid preset 'method default' auto-selects the recommended grid for the chosen method."
       ]
     },
     {
@@ -71,7 +71,7 @@
       ],
       "size": {
         "0": 310,
-        "1": 230
+        "1": 250
       },
       "flags": {},
       "order": 1,
@@ -113,6 +113,7 @@
       },
       "widgets_values": [
         "nb2",
+        "method default",
         2,
         2,
         -1.0,
@@ -125,7 +126,7 @@
       "type": "PreviewImage",
       "pos": [
         380,
-        520
+        540
       ],
       "size": {
         "0": 310,
@@ -689,7 +690,7 @@
       "type": "ShowTextAM",
       "pos": [
         2110,
-        850
+        870
       ],
       "size": {
         "0": 310,
