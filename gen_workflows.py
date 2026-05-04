@@ -8,6 +8,7 @@ def build_workflow(method, grid_cols, grid_rows, filename_prefix, note_text, out
     def nl(fn, fs, tn, ts, t): _lid[0] += 1; return [_lid[0], fn, fs, tn, ts, t]
 
     NOTE_ID      = nn()
+    REF_NOTE_ID  = nn()
     LOAD_ID      = nn()
     CROP_ID      = nn()
     PREV_CROP_ID = nn()
@@ -48,11 +49,50 @@ def build_workflow(method, grid_cols, grid_rows, filename_prefix, note_text, out
 
     nodes = []
 
+    REF_NOTE_TEXT = (
+        "UPSCALER QUICK REFERENCE\n"
+        "──────────────────────────────────────────────────────────────\n"
+        "NB2 (Nano Banana 2)\n"
+        "  Method: nb2 | Grid: 2×2 | Overlap: 20% | Feather: strong | Color match: ON\n"
+        "  Prompt: YES — connect the same prompt to every NB2 node. Describe the output style and detail level.\n"
+        "  Tip: pass the original image as reference to anchor the regeneration.\n"
+        "\n"
+        "GPT-Image-2\n"
+        "  Method: image_2 | Grid: 2×2 | Overlap: 20% | Feather: strong | Color match: ON\n"
+        "  Prompt: YES — same prompt to all tiles + optional reference image input.\n"
+        "\n"
+        "Topaz (Photo AI / Sharpen AI)\n"
+        "  Method: topaz | Grid: 2×2 | Overlap: 8% | Feather: minimal | Color match: OFF\n"
+        "  Prompt: none. If seams appear → raise overlap to 15%, set feather_mode_override = medium in Tile Stitch.\n"
+        "\n"
+        "SeedVR2\n"
+        "  Method: seedv2 | Grid: 2×3 | Overlap: 10–20% | Feather: strong | Color match: ON\n"
+        "  Prompt: none. 2×3 grid gives square-ish tiles (model was trained on landscape video frames).\n"
+        "  If seams persist → raise overlap to 20%.\n"
+        "\n"
+        "ESRGAN / RealESRGAN\n"
+        "  Method: topaz or passthrough | Grid: 2×2 (or batch mode) | Feather: minimal | Color match: OFF\n"
+        "  Prompt: none. These models accept a full batch — you can skip Extract/Collect entirely.\n"
+        "──────────────────────────────────────────────────────────────\n"
+        "PROMPT TIPS (regenerative models — NB2, GPT-Image-2)\n"
+        "  • Same prompt to ALL tiles — diverging prompts cause seams feathering cannot fix\n"
+        "  • Describe the output, not the input  (e.g. 'sharp portrait, fine skin texture, soft light')\n"
+        "  • Pass the original image as a reference / style input to keep regeneration anchored\n"
+        "  • If color looks inconsistent between tiles → color_match_override = on in Tile Stitch"
+    )
+
     nodes.append({
         "id": NOTE_ID, "type": "Note",
         "pos": [X_LOAD, 30], "size": {"0": 980, "1": 170},
         "flags": {}, "order": 0, "mode": 0, "inputs": [], "outputs": [],
         "properties": {}, "widgets_values": [note_text]
+    })
+
+    nodes.append({
+        "id": REF_NOTE_ID, "type": "Note",
+        "pos": [X_LOAD + 1010, 30], "size": {"0": 780, "1": 560},
+        "flags": {}, "order": 0, "mode": 0, "inputs": [], "outputs": [],
+        "properties": {}, "widgets_values": [REF_NOTE_TEXT]
     })
 
     nodes.append({

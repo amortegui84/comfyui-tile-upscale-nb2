@@ -1,7 +1,7 @@
 {
   "id": "tile-upscale-image_2-3x2",
   "revision": 1,
-  "last_node_id": 22,
+  "last_node_id": 23,
   "last_link_id": 27,
   "nodes": [
     {
@@ -27,6 +27,27 @@
     },
     {
       "id": 2,
+      "type": "Note",
+      "pos": [
+        1050,
+        30
+      ],
+      "size": {
+        "0": 780,
+        "1": 560
+      },
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "UPSCALER QUICK REFERENCE\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nNB2 (Nano Banana 2)\n  Method: nb2 | Grid: 2\u00d72 | Overlap: 20% | Feather: strong | Color match: ON\n  Prompt: YES \u2014 connect the same prompt to every NB2 node. Describe the output style and detail level.\n  Tip: pass the original image as reference to anchor the regeneration.\n\nGPT-Image-2\n  Method: image_2 | Grid: 2\u00d72 | Overlap: 20% | Feather: strong | Color match: ON\n  Prompt: YES \u2014 same prompt to all tiles + optional reference image input.\n\nTopaz (Photo AI / Sharpen AI)\n  Method: topaz | Grid: 2\u00d72 | Overlap: 8% | Feather: minimal | Color match: OFF\n  Prompt: none. If seams appear \u2192 raise overlap to 15%, set feather_mode_override = medium in Tile Stitch.\n\nSeedVR2\n  Method: seedv2 | Grid: 2\u00d73 | Overlap: 10\u201320% | Feather: strong | Color match: ON\n  Prompt: none. 2\u00d73 grid gives square-ish tiles (model was trained on landscape video frames).\n  If seams persist \u2192 raise overlap to 20%.\n\nESRGAN / RealESRGAN\n  Method: topaz or passthrough | Grid: 2\u00d72 (or batch mode) | Feather: minimal | Color match: OFF\n  Prompt: none. These models accept a full batch \u2014 you can skip Extract/Collect entirely.\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nPROMPT TIPS (regenerative models \u2014 NB2, GPT-Image-2)\n  \u2022 Same prompt to ALL tiles \u2014 diverging prompts cause seams feathering cannot fix\n  \u2022 Describe the output, not the input  (e.g. 'sharp portrait, fine skin texture, soft light')\n  \u2022 Pass the original image as a reference / style input to keep regeneration anchored\n  \u2022 If color looks inconsistent between tiles \u2192 color_match_override = on in Tile Stitch"
+      ]
+    },
+    {
+      "id": 3,
       "type": "LoadImage",
       "pos": [
         40,
@@ -63,7 +84,7 @@
       ]
     },
     {
-      "id": 3,
+      "id": 4,
       "type": "TileCropAM",
       "pos": [
         380,
@@ -124,7 +145,7 @@
       ]
     },
     {
-      "id": 4,
+      "id": 5,
       "type": "PreviewImage",
       "pos": [
         380,
@@ -151,7 +172,7 @@
       "widgets_values": []
     },
     {
-      "id": 5,
+      "id": 6,
       "type": "TileExtractAM",
       "pos": [
         740,
@@ -193,7 +214,7 @@
       ]
     },
     {
-      "id": 6,
+      "id": 7,
       "type": "TileExtractAM",
       "pos": [
         740,
@@ -235,7 +256,7 @@
       ]
     },
     {
-      "id": 7,
+      "id": 8,
       "type": "TileExtractAM",
       "pos": [
         740,
@@ -277,7 +298,7 @@
       ]
     },
     {
-      "id": 8,
+      "id": 9,
       "type": "TileExtractAM",
       "pos": [
         740,
@@ -319,7 +340,7 @@
       ]
     },
     {
-      "id": 9,
+      "id": 10,
       "type": "TileExtractAM",
       "pos": [
         740,
@@ -361,7 +382,7 @@
       ]
     },
     {
-      "id": 10,
+      "id": 11,
       "type": "TileExtractAM",
       "pos": [
         740,
@@ -403,7 +424,7 @@
       ]
     },
     {
-      "id": 11,
+      "id": 12,
       "type": "TileScaleByAM",
       "pos": [
         1040,
@@ -441,7 +462,7 @@
       ]
     },
     {
-      "id": 12,
+      "id": 13,
       "type": "TileScaleByAM",
       "pos": [
         1040,
@@ -479,7 +500,7 @@
       ]
     },
     {
-      "id": 13,
+      "id": 14,
       "type": "TileScaleByAM",
       "pos": [
         1040,
@@ -517,7 +538,7 @@
       ]
     },
     {
-      "id": 14,
+      "id": 15,
       "type": "TileScaleByAM",
       "pos": [
         1040,
@@ -555,7 +576,7 @@
       ]
     },
     {
-      "id": 15,
+      "id": 16,
       "type": "TileScaleByAM",
       "pos": [
         1040,
@@ -593,7 +614,7 @@
       ]
     },
     {
-      "id": 16,
+      "id": 17,
       "type": "TileScaleByAM",
       "pos": [
         1040,
@@ -631,7 +652,7 @@
       ]
     },
     {
-      "id": 17,
+      "id": 18,
       "type": "TileCollectAM",
       "pos": [
         1380,
@@ -714,7 +735,7 @@
       "widgets_values": []
     },
     {
-      "id": 18,
+      "id": 19,
       "type": "PreviewImage",
       "pos": [
         1380,
@@ -741,7 +762,7 @@
       "widgets_values": []
     },
     {
-      "id": 19,
+      "id": 20,
       "type": "TileStitchAM",
       "pos": [
         1760,
@@ -785,7 +806,7 @@
       ]
     },
     {
-      "id": 20,
+      "id": 21,
       "type": "PreviewImage",
       "pos": [
         2110,
@@ -812,7 +833,7 @@
       "widgets_values": []
     },
     {
-      "id": 21,
+      "id": 22,
       "type": "SaveImageWithDPI",
       "pos": [
         2110,
@@ -858,7 +879,7 @@
       ]
     },
     {
-      "id": 22,
+      "id": 23,
       "type": "ShowTextAM",
       "pos": [
         2110,
@@ -894,14 +915,6 @@
   "links": [
     [
       1,
-      2,
-      0,
-      3,
-      0,
-      "IMAGE"
-    ],
-    [
-      2,
       3,
       0,
       4,
@@ -909,71 +922,71 @@
       "IMAGE"
     ],
     [
+      2,
+      4,
+      0,
+      5,
+      0,
+      "IMAGE"
+    ],
+    [
       3,
-      3,
+      4,
       1,
-      17,
+      18,
       1,
       "STRING"
     ],
     [
       4,
-      3,
-      0,
-      5,
-      0,
-      "IMAGE"
-    ],
-    [
-      5,
-      3,
+      4,
       0,
       6,
       0,
       "IMAGE"
     ],
     [
-      6,
-      3,
-      0,
-      7,
-      0,
-      "IMAGE"
-    ],
-    [
-      7,
-      3,
-      0,
-      8,
-      0,
-      "IMAGE"
-    ],
-    [
-      8,
-      3,
-      0,
-      9,
-      0,
-      "IMAGE"
-    ],
-    [
-      9,
-      3,
-      0,
-      10,
-      0,
-      "IMAGE"
-    ],
-    [
-      10,
       5,
+      4,
+      0,
+      7,
+      0,
+      "IMAGE"
+    ],
+    [
+      6,
+      4,
+      0,
+      8,
+      0,
+      "IMAGE"
+    ],
+    [
+      7,
+      4,
+      0,
+      9,
+      0,
+      "IMAGE"
+    ],
+    [
+      8,
+      4,
+      0,
+      10,
+      0,
+      "IMAGE"
+    ],
+    [
+      9,
+      4,
       0,
       11,
       0,
       "IMAGE"
     ],
     [
-      11,
+      10,
       6,
       0,
       12,
@@ -981,7 +994,7 @@
       "IMAGE"
     ],
     [
-      12,
+      11,
       7,
       0,
       13,
@@ -989,7 +1002,7 @@
       "IMAGE"
     ],
     [
-      13,
+      12,
       8,
       0,
       14,
@@ -997,7 +1010,7 @@
       "IMAGE"
     ],
     [
-      14,
+      13,
       9,
       0,
       15,
@@ -1005,7 +1018,7 @@
       "IMAGE"
     ],
     [
-      15,
+      14,
       10,
       0,
       16,
@@ -1013,7 +1026,7 @@
       "IMAGE"
     ],
     [
-      16,
+      15,
       11,
       0,
       17,
@@ -1021,90 +1034,98 @@
       "IMAGE"
     ],
     [
-      17,
+      16,
       12,
       0,
+      18,
+      0,
+      "IMAGE"
+    ],
+    [
       17,
+      13,
+      0,
+      18,
       2,
       "IMAGE"
     ],
     [
       18,
-      13,
+      14,
       0,
-      17,
+      18,
       3,
       "IMAGE"
     ],
     [
       19,
-      14,
+      15,
       0,
-      17,
+      18,
       4,
       "IMAGE"
     ],
     [
       20,
-      15,
+      16,
       0,
-      17,
+      18,
       5,
       "IMAGE"
     ],
     [
       21,
-      16,
-      0,
       17,
+      0,
+      18,
       6,
       "IMAGE"
     ],
     [
       22,
-      17,
-      0,
       18,
+      0,
+      19,
       0,
       "IMAGE"
     ],
     [
       23,
-      17,
-      0,
-      19,
-      0,
-      "IMAGE"
-    ],
-    [
-      24,
-      17,
-      3,
-      19,
-      1,
-      "STRING"
-    ],
-    [
-      25,
-      19,
+      18,
       0,
       20,
       0,
       "IMAGE"
     ],
     [
-      26,
-      19,
+      24,
+      18,
+      3,
+      20,
+      1,
+      "STRING"
+    ],
+    [
+      25,
+      20,
       0,
       21,
       0,
       "IMAGE"
     ],
     [
-      27,
-      21,
-      1,
+      26,
+      20,
+      0,
       22,
+      0,
+      "IMAGE"
+    ],
+    [
+      27,
+      22,
+      1,
+      23,
       0,
       "STRING"
     ]
