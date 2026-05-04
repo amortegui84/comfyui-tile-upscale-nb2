@@ -1,13 +1,18 @@
 [project]
-name = "comfyui-tile-upscale-nb2"
-version = "2.0.0"
-description = "Universal tile upscale nodes for ComfyUI — NB2, ChatGPT-Image-2, DALL-E-3, SDXL, Topaz-passthrough. N×M grid (2×2…4×4)."
+name = "comfyui-tile-upscale-am"
+version = "0.1.0"
+description = "Method-aware tile upscale nodes for ComfyUI with regenerative/faithful stitching and DPI export."
 license = { text = "Apache-2.0" }
+dependencies = [
+    "numpy>=1.24.0",
+    "pillow>=10.0.0",
+    "torch>=2.0.0",
+]
 
 [project.urls]
-Repository = "https://github.com/amortegui84/comfyui-tile-upscale-nb2"
+Repository = "https://github.com/amortegui84/comfyui-tile-upscale-AM"
 
 [tool.comfy]
 PublisherId = "amortegui84"
-DisplayName = "Tile Upscale Universal"
+DisplayName = "Tile Upscale AM"
 Icon = ""

@@ -1,2 +1,4 @@
 .claude/
 __pycache__/
+_local_backups/
+output/
