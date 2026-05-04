@@ -1,6 +1,6 @@
 import json, os
 
-def build_workflow(method, grid_cols, grid_rows, filename_prefix, note_text, out_path):
+def build_workflow(method, grid_cols, grid_rows, filename_prefix, note_text, out_path, grid_preset="method default"):
     N = grid_cols * grid_rows
 
     _nid = [0]; _lid = [0]
@@ -119,7 +119,7 @@ def build_workflow(method, grid_cols, grid_rows, filename_prefix, note_text, out
             {"name": "tile_count",    "type": "INT",    "links": None}
         ],
         "properties": {"Node name for S&R": "TileCropAM"},
-        "widgets_values": [method, "method default", grid_cols, grid_rows, -1.0, 0, 0]
+        "widgets_values": [method, grid_preset, grid_cols, grid_rows, -1.0, 0, 0]
     })
 
     crop_bottom = Y_MAIN + 250 + 40
@@ -262,7 +262,8 @@ build_workflow(
     method="image_2", grid_cols=3, grid_rows=2,
     filename_prefix="image2_tile_upscale",
     note_text="GPT Image 2 Tile Upscale - Regenerative 3x2 (6 tiles)\n\nPipeline: Tile Crop -> preview tiles -> Extract (x6) -> Scale By Placeholder (x6) -> Tile Collect -> preview upscaled -> Tile Stitch -> preview + Save + print size.\n\nReplace each Tile Scale By / Placeholder with your GPT-Image-2 or NB2 upscaler node.\ntile_metadata flows linearly: TileCropAM -> TileCollectAM (passthrough) -> TileStitchAM.\nGrid preset 'method default' auto-selects the recommended grid for the chosen method.",
-    out_path="workflows/tile_upscale_02_image2_3x2_6_tiles.json"
+    out_path="workflows/tile_upscale_02_image2_3x2_6_tiles.json",
+    grid_preset="3×2 — landscape tiles"
 )
 
 build_workflow(
