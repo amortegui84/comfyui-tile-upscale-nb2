@@ -938,6 +938,36 @@ class SaveImageWithDPI:
         return {"ui": {"images": results}, "result": (path, size_info)}
 
 
+# ── ShowTextAM ─────────────────────────────────────────────────────────────────
+
+class ShowTextAM:
+    """
+    Display a text string inside the node — useful for showing print_size_info
+    from SaveImageWithDPI at the end of the workflow.
+    """
+
+    CATEGORY = "AM/TileUpscale"
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("text",)
+    FUNCTION = "show_text"
+    OUTPUT_NODE = True
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "text": ("STRING", {"forceInput": True}),
+            },
+        }
+
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        return float("nan")
+
+    def show_text(self, text: str):
+        return {"ui": {"text": [text]}, "result": (text,)}
+
+
 # ── Node registration (imported by __init__.py) ────────────────────────────────
 
 NODE_CLASS_MAPPINGS: dict[str, type] = {
@@ -948,6 +978,7 @@ NODE_CLASS_MAPPINGS: dict[str, type] = {
     "TileStitchAM": TileStitchAM,
     "TileInfoAM": TileInfoAM,
     "SaveImageWithDPI": SaveImageWithDPI,
+    "ShowTextAM": ShowTextAM,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS: dict[str, str] = {
@@ -957,5 +988,6 @@ NODE_DISPLAY_NAME_MAPPINGS: dict[str, str] = {
     "TileCollectAM": "4. Tile Collect (AM)",
     "TileStitchAM": "5. Tile Stitch (AM)",
     "TileInfoAM": "Tile Info / Debug (AM)",
+    "ShowTextAM": "Show Text (AM)",
     "SaveImageWithDPI": "Save Image With DPI (AM)",
 }

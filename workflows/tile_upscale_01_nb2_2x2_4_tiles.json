@@ -1,8 +1,8 @@
 {
   "id": "tile-upscale-nb2-2x2",
-  "revision": 1,
-  "last_node_id": 17,
-  "last_link_id": 20,
+  "revision": 2,
+  "last_node_id": 18,
+  "last_link_id": 21,
   "nodes": [
     {
       "id": 1,
@@ -664,6 +664,13 @@
           "name": "saved_path",
           "type": "STRING",
           "links": null
+        },
+        {
+          "name": "print_size_info",
+          "type": "STRING",
+          "links": [
+            21
+          ]
         }
       ],
       "properties": {
@@ -676,6 +683,39 @@
         95,
         ""
       ]
+    },
+    {
+      "id": 18,
+      "type": "ShowTextAM",
+      "pos": [
+        2110,
+        850
+      ],
+      "size": {
+        "0": 310,
+        "1": 120
+      },
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "text",
+          "type": "STRING",
+          "link": 21
+        }
+      ],
+      "outputs": [
+        {
+          "name": "text",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ShowTextAM"
+      },
+      "widgets_values": []
     }
   ],
   "links": [
@@ -838,6 +878,14 @@
       17,
       0,
       "IMAGE"
+    ],
+    [
+      21,
+      17,
+      1,
+      18,
+      0,
+      "STRING"
     ]
   ],
   "groups": [],
