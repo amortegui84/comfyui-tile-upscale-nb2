@@ -60,7 +60,7 @@ METHOD_PRESETS: dict[str, dict] = {
         "feather_mode": "strong",
         "color_match": True,
         "recommended_cols": 2,
-        "recommended_rows": 3,
+        "recommended_rows": 2,
         "description": "SeedV2-style faithful upscale — square-ish tiles, color match on",
     },
     "passthrough": {
@@ -104,6 +104,9 @@ GRID_PRESETS: dict[str, tuple[int, int] | None] = {
 # Lower power (1.0 = linear) = softer, wider transition.
 _FEATHER_POWER = {"strong": 1.0, "medium": 2.0, "minimal": 4.0}
 MAX_COLLECT_TILES = 24
+FIXED_GRID_COLS = 2
+FIXED_GRID_ROWS = 2
+FIXED_TILE_COUNT = FIXED_GRID_COLS * FIXED_GRID_ROWS
 
 
 # ── Image helpers ──────────────────────────────────────────────────────────────
@@ -311,6 +314,10 @@ class TileCropAM:
 
         preset = METHOD_PRESETS[method]
 
+        requested_grid_cols = int(grid_cols)
+        requested_grid_rows = int(grid_rows)
+        requested_grid_preset = grid_preset
+
         # Resolve grid dimensions from preset or manual override.
         if grid_preset == "method default":
             grid_cols = preset["recommended_cols"]
@@ -318,6 +325,13 @@ class TileCropAM:
         elif grid_preset != "manual":
             gc, gr = GRID_PRESETS[grid_preset]
             grid_cols, grid_rows = gc, gr
+
+        # Keep all AM tile workflows on a fixed 2x2 contract. Older saved
+        # workflows may still carry 3x2/manual presets while their Collect node
+        # is wired differently; normalizing here keeps tiles and metadata in
+        # sync before anything reaches TileStitchAM.
+        if int(grid_cols) != FIXED_GRID_COLS or int(grid_rows) != FIXED_GRID_ROWS:
+            grid_cols, grid_rows = FIXED_GRID_COLS, FIXED_GRID_ROWS
 
         eff_overlap = overlap_percent if overlap_percent >= 0.0 else preset["recommended_overlap_pct"]
 
@@ -384,8 +398,12 @@ class TileCropAM:
         metadata = {
             "method": method,
             "preset": preset,
+            "requested_grid_preset": requested_grid_preset,
+            "requested_grid_cols": requested_grid_cols,
+            "requested_grid_rows": requested_grid_rows,
             "grid_cols": grid_cols,
             "grid_rows": grid_rows,
+            "tile_count_policy": "fixed_2x2",
             "overlap_pct": eff_overlap,
             "overlap_w": ov_w,
             "overlap_h": ov_h,
@@ -544,6 +562,19 @@ class TileCollectAM:
                 raise ValueError(f"TileCollectAM expected tile_{idx} as IMAGE [B,H,W,C], got {tuple(tile.shape)}")
             connected.append(tile[:1])
 
+        expected = None
+        if tile_metadata:
+            try:
+                meta = json.loads(tile_metadata)
+                expected = len(meta.get("tiles", []))
+            except Exception:
+                expected = None
+
+        warnings: list[str] = []
+        if expected is not None and len(connected) > expected:
+            warnings.append(f"ignored {len(connected) - expected} extra tile input(s) beyond metadata count")
+            connected = connected[:expected]
+
         ref_h, ref_w = connected[0].shape[1], connected[0].shape[2]
         normalized: list[torch.Tensor] = []
         resized_count = 0
@@ -554,15 +585,6 @@ class TileCollectAM:
                 resized_count += 1
             normalized.append(one.unsqueeze(0))
 
-        expected = None
-        if tile_metadata:
-            try:
-                meta = json.loads(tile_metadata)
-                expected = len(meta.get("tiles", []))
-            except Exception:
-                expected = None
-
-        warnings: list[str] = []
         if expected is not None and expected != len(normalized):
             warnings.append(f"metadata expects {expected} tiles but TileCollectAM received {len(normalized)}")
         if missing_before_connected:
