@@ -61,7 +61,7 @@ METHOD_PRESETS: dict[str, dict] = {
         "color_match": True,
         "recommended_cols": 2,
         "recommended_rows": 2,
-        "description": "SeedV2-style faithful upscale — square-ish tiles, color match on",
+        "description": "SeedV2-style faithful upscale — fixed 2x2 tiles, color match on",
     },
     "passthrough": {
         "category": "passthrough",
@@ -85,18 +85,10 @@ METHOD_PRESETS: dict[str, dict] = {
     },
 }
 
-# Grid presets: label → (cols, rows).  "method default" resolved at runtime from METHOD_PRESETS.
+# Grid presets are intentionally fixed. Keep the old input names for saved
+# workflow compatibility, but do not expose alternate layouts in the UI.
 GRID_PRESETS: dict[str, tuple[int, int] | None] = {
-    "method default": None,
-    "2×2": (2, 2),
-    "2×3 — portrait tiles": (2, 3),
-    "3×2 — landscape tiles": (3, 2),
-    "3×3": (3, 3),
-    "4×2": (4, 2),
-    "2×4": (2, 4),
-    "4×3": (4, 3),
-    "3×4": (3, 4),
-    "manual": None,
+    "fixed 2×2": (2, 2),
 }
 
 # Smoothstep power per feather mode.
@@ -246,18 +238,14 @@ class TileCropAM:
                 "grid_preset": (
                     list(GRID_PRESETS.keys()),
                     {
-                        "default": "method default",
-                        "tooltip": (
-                            "'method default' uses the recommended grid for the selected method. "
-                            "'manual' uses the grid_cols / grid_rows values below. "
-                            "Any other preset overrides grid_cols / grid_rows."
-                        ),
+                        "default": "fixed 2×2",
+                        "tooltip": "Fixed 2x2 layout. This node always outputs exactly 4 tiles.",
                     },
                 ),
-                "grid_cols": ("INT", {"default": 2, "min": 1, "max": 16, "step": 1,
-                                      "tooltip": "Active only when grid_preset = manual."}),
-                "grid_rows": ("INT", {"default": 2, "min": 1, "max": 16, "step": 1,
-                                      "tooltip": "Active only when grid_preset = manual."}),
+                "grid_cols": ("INT", {"default": 2, "min": 2, "max": 2, "step": 1,
+                                      "tooltip": "Fixed at 2 columns."}),
+                "grid_rows": ("INT", {"default": 2, "min": 2, "max": 2, "step": 1,
+                                      "tooltip": "Fixed at 2 rows."}),
                 "overlap_percent": (
                     "FLOAT",
                     {
@@ -318,20 +306,9 @@ class TileCropAM:
         requested_grid_rows = int(grid_rows)
         requested_grid_preset = grid_preset
 
-        # Resolve grid dimensions from preset or manual override.
-        if grid_preset == "method default":
-            grid_cols = preset["recommended_cols"]
-            grid_rows = preset["recommended_rows"]
-        elif grid_preset != "manual":
-            gc, gr = GRID_PRESETS[grid_preset]
-            grid_cols, grid_rows = gc, gr
-
-        # Keep all AM tile workflows on a fixed 2x2 contract. Older saved
-        # workflows may still carry 3x2/manual presets while their Collect node
-        # is wired differently; normalizing here keeps tiles and metadata in
-        # sync before anything reaches TileStitchAM.
-        if int(grid_cols) != FIXED_GRID_COLS or int(grid_rows) != FIXED_GRID_ROWS:
-            grid_cols, grid_rows = FIXED_GRID_COLS, FIXED_GRID_ROWS
+        # Always use a fixed 2x2 contract. The grid_* parameters remain in the
+        # function signature only so older saved workflows keep loading.
+        grid_cols, grid_rows = FIXED_GRID_COLS, FIXED_GRID_ROWS
 
         eff_overlap = overlap_percent if overlap_percent >= 0.0 else preset["recommended_overlap_pct"]
 

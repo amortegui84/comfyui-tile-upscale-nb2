@@ -1,6 +1,6 @@
 import json, os
 
-def build_workflow(method, grid_cols, grid_rows, filename_prefix, note_text, out_path, grid_preset="method default"):
+def build_workflow(method, grid_cols, grid_rows, filename_prefix, note_text, out_path, grid_preset="fixed 2×2"):
     N = grid_cols * grid_rows
 
     _nid = [0]; _lid = [0]
@@ -66,8 +66,8 @@ def build_workflow(method, grid_cols, grid_rows, filename_prefix, note_text, out
         "  Prompt: none. If seams appear → raise overlap to 15%, set feather_mode_override = medium in Tile Stitch.\n"
         "\n"
         "SeedVR2\n"
-        "  Method: seedv2 | Grid: 2×3 | Overlap: 10–20% | Feather: strong | Color match: ON\n"
-        "  Prompt: none. 2×3 grid gives square-ish tiles (model was trained on landscape video frames).\n"
+        "  Method: seedv2 | Grid: 2×2 | Overlap: 10–20% | Feather: strong | Color match: ON\n"
+        "  Prompt: none.\n"
         "  If seams persist → raise overlap to 20%.\n"
         "\n"
         "ESRGAN / RealESRGAN\n"
@@ -254,21 +254,21 @@ def build_workflow(method, grid_cols, grid_rows, filename_prefix, note_text, out
 build_workflow(
     method="nb2", grid_cols=2, grid_rows=2,
     filename_prefix="nb2_tile_upscale",
-    note_text="NB2 Tile Upscale - Regenerative 2x2 (4 tiles)\n\nPipeline: Tile Crop -> preview tiles -> Extract (x4) -> Scale By Placeholder (x4) -> Tile Collect -> preview upscaled -> Tile Stitch -> preview + Save + print size.\n\nReplace each Tile Scale By / Placeholder with your NB2 or GPT-Image-2 upscaler node.\ntile_metadata flows linearly: TileCropAM -> TileCollectAM (passthrough) -> TileStitchAM.\nGrid preset 'method default' auto-selects the recommended grid for the chosen method.",
+    note_text="NB2 Tile Upscale - Regenerative 2x2 (4 tiles)\n\nPipeline: Tile Crop -> preview tiles -> Extract (x4) -> Scale By Placeholder (x4) -> Tile Collect -> preview upscaled -> Tile Stitch -> preview + Save + print size.\n\nReplace each Tile Scale By / Placeholder with your NB2 or GPT-Image-2 upscaler node.\ntile_metadata flows linearly: TileCropAM -> TileCollectAM (passthrough) -> TileStitchAM.\nTile Crop is fixed at 2x2.",
     out_path="workflows/tile_upscale_01_nb2_2x2_4_tiles.json"
 )
 
 build_workflow(
-    method="image_2", grid_cols=3, grid_rows=2,
+    method="image_2", grid_cols=2, grid_rows=2,
     filename_prefix="image2_tile_upscale",
-    note_text="GPT Image 2 Tile Upscale - Regenerative 3x2 (6 tiles)\n\nPipeline: Tile Crop -> preview tiles -> Extract (x6) -> Scale By Placeholder (x6) -> Tile Collect -> preview upscaled -> Tile Stitch -> preview + Save + print size.\n\nReplace each Tile Scale By / Placeholder with your GPT-Image-2 or NB2 upscaler node.\ntile_metadata flows linearly: TileCropAM -> TileCollectAM (passthrough) -> TileStitchAM.\nGrid preset 'method default' auto-selects the recommended grid for the chosen method.",
-    out_path="workflows/tile_upscale_02_image2_3x2_6_tiles.json",
-    grid_preset="3×2 — landscape tiles"
+    note_text="GPT Image 2 Tile Upscale - Regenerative 2x2 (4 tiles)\n\nPipeline: Tile Crop -> preview tiles -> Extract (x4) -> Scale By Placeholder (x4) -> Tile Collect -> preview upscaled -> Tile Stitch -> preview + Save + print size.\n\nReplace each Tile Scale By / Placeholder with your GPT-Image-2 or NB2 upscaler node.\ntile_metadata flows linearly: TileCropAM -> TileCollectAM (passthrough) -> TileStitchAM.\nTile Crop is fixed at 2x2.",
+    out_path="workflows/tile_upscale_02_image2_2x2_4_tiles.json",
+    grid_preset="fixed 2×2"
 )
 
 build_workflow(
     method="topaz", grid_cols=2, grid_rows=2,
     filename_prefix="topaz_tile_upscale",
-    note_text="Faithful Tile Upscale - Topaz / SeedV2 2x2 (4 tiles)\n\nPipeline: Tile Crop -> preview tiles -> Extract (x4) -> Scale By Placeholder (x4) -> Tile Collect -> preview upscaled -> Tile Stitch -> preview + Save + print size.\n\nReplace each Tile Scale By / Placeholder with Topaz, SeedV2, ESRGAN, or another faithful upscaler.\ntile_metadata flows linearly: TileCropAM -> TileCollectAM (passthrough) -> TileStitchAM.\nFor SeedVR2: change method to 'seedv2' — grid_preset 'method default' will switch to 2x3 (square-ish tiles).",
+    note_text="Faithful Tile Upscale - Topaz / SeedV2 2x2 (4 tiles)\n\nPipeline: Tile Crop -> preview tiles -> Extract (x4) -> Scale By Placeholder (x4) -> Tile Collect -> preview upscaled -> Tile Stitch -> preview + Save + print size.\n\nReplace each Tile Scale By / Placeholder with Topaz, SeedV2, ESRGAN, or another faithful upscaler.\ntile_metadata flows linearly: TileCropAM -> TileCollectAM (passthrough) -> TileStitchAM.\nTile Crop is fixed at 2x2.",
     out_path="workflows/tile_upscale_03_faithful_2x2_4_tiles.json"
 )

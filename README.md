@@ -25,8 +25,8 @@ Splits the source image into a row-major IMAGE batch and emits JSON metadata tha
 |---|---|
 | `image` | Source image |
 | `method` | Blend preset: `nb2`, `image_2`, `topaz`, `seedv2`, `passthrough`, `custom` |
-| `grid_preset` | `method default` auto-selects the recommended grid for the chosen method. Pick any fixed preset (e.g. `2×3 — portrait tiles`) to override, or `manual` to use `grid_cols`/`grid_rows` directly. |
-| `grid_cols`, `grid_rows` | Active only when `grid_preset = manual` |
+| `grid_preset` | Fixed at `2×2`. The node always outputs exactly 4 tiles. |
+| `grid_cols`, `grid_rows` | Fixed at `2` for saved-workflow compatibility |
 | `overlap_percent` | `-1` uses the method preset default |
 | `target_tile_width/height` | Optional: force a uniform output tile size |
 
@@ -107,7 +107,7 @@ The `method` in Tile Crop selects blend geometry — not which upscaler to use. 
 | `nb2` | regenerative | 20% | 2×2 | strong feather, color match |
 | `image_2` | regenerative | 20% | 2×2 | strong feather, color match |
 | `topaz` | faithful | 8% | 2×2 | minimal feather, no color match |
-| `seedv2` | faithful | 10% | 2×3 | strong feather, color match — square-ish tiles suit the model |
+| `seedv2` | faithful | 10% | 2×2 | strong feather, color match |
 | `passthrough` | passthrough | 4% | 2×2 | near-exact placement |
 | `custom` | custom | 12% | 2×2 | medium feather, user-controlled |
 
@@ -122,8 +122,8 @@ Choose the row that matches your upscaler. All settings can be adjusted in the n
 | **NB2** (Nano Banana 2) | `nb2` | 2×2 | 20% | strong | on | **Yes — required.** Connect the same text prompt to every NB2 node. Describe the subject, style, and level of detail you want. A consistent prompt across all tiles prevents content drift between them. |
 | **GPT-Image-2** | `image_2` | 2×2 | 20% | strong | on | **Yes — recommended.** Connect the same prompt to every Image-2 node. Include a description of the scene plus any style or quality keywords. You can also pass the original image as a reference input to anchor the regeneration. |
 | **Topaz** (Photo AI / Sharpen AI) | `topaz` | 2×2 | 8% | minimal | off | **No prompt.** Topaz is a faithful upscaler — it does not accept text input. If seams appear, raise overlap to 15% and switch `feather_mode_override` to `medium` in Tile Stitch. |
-| **SeedVR2** | `seedv2` | 2×3 | 10–20% | strong | on | **No prompt.** SeedVR2 was trained on video frames (landscape aspect ratio), so the 2×3 default grid produces square-ish tiles that fit the model better. Color match is on by default because SeedVR2 can introduce subtle per-tile brightness drift. If seams are still visible, raise overlap to 20%. |
-| **ESRGAN / RealESRGAN** | `topaz` or `passthrough` | 2×2 or batch | 8% | minimal | off | **No prompt.** These models accept a whole batch — you can skip Tile Extract and Tile Collect entirely and wire the tile batch directly to your ESRGAN node, then straight to Tile Stitch. |
+| **SeedVR2** | `seedv2` | 2×2 | 10–20% | strong | on | **No prompt.** Color match is on by default because SeedVR2 can introduce subtle per-tile brightness drift. If seams are still visible, raise overlap to 20%. |
+| **ESRGAN / RealESRGAN** | `topaz` or `passthrough` | 2×2 or batch | 8% | minimal | off | **No prompt.** These models accept a whole batch, or you can use the fixed 2×2 tile workflow. |
 
 ### About prompts for regenerative upscalers (NB2, GPT-Image-2)
 
@@ -182,10 +182,10 @@ All three workflows ship with **Tile Scale By / Placeholder (AM)** as the upscal
 | File | Method | Grid | Tiles | Upscaler slot |
 |---|---|---|---|---|
 | `tile_upscale_01_nb2_2x2_4_tiles.json` | `nb2` | 2×2 | 4 | 4× TileScaleByAM |
-| `tile_upscale_02_image2_3x2_6_tiles.json` | `image_2` | 3×2 | 6 | 6× TileScaleByAM |
+| `tile_upscale_02_image2_2x2_4_tiles.json` | `image_2` | 2×2 | 4 | 4× TileScaleByAM |
 | `tile_upscale_03_faithful_2x2_4_tiles.json` | `topaz` | 2×2 | 4 | 4× TileScaleByAM |
 
-Each workflow includes a preview after the crop (see all tiles) and a preview after the collect (see all upscaled tiles before stitching). To use more tiles, increase `grid_cols`/`grid_rows` in Tile Crop and add the matching Extract + ScaleBy nodes.
+Each workflow includes a preview after the crop (see all tiles) and a preview after the collect (see all upscaled tiles before stitching). Tile Crop is fixed at 2×2 so Tile Stitch always receives matching 4-tile metadata.
 
 ---
 

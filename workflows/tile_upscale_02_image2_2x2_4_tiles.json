@@ -1,8 +1,8 @@
 {
-  "id": "tile-upscale-image_2-3x2",
+  "id": "tile-upscale-image_2-2x2",
   "revision": 1,
-  "last_node_id": 23,
-  "last_link_id": 27,
+  "last_node_id": 19,
+  "last_link_id": 21,
   "nodes": [
     {
       "id": 1,
@@ -22,7 +22,7 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "GPT Image 2 Tile Upscale - Regenerative 3x2 (6 tiles)\n\nPipeline: Tile Crop -> preview tiles -> Extract (x6) -> Scale By Placeholder (x6) -> Tile Collect -> preview upscaled -> Tile Stitch -> preview + Save + print size.\n\nReplace each Tile Scale By / Placeholder with your GPT-Image-2 or NB2 upscaler node.\ntile_metadata flows linearly: TileCropAM -> TileCollectAM (passthrough) -> TileStitchAM.\nGrid preset 'method default' auto-selects the recommended grid for the chosen method."
+        "GPT Image 2 Tile Upscale - Regenerative 2x2 (4 tiles)\n\nPipeline: Tile Crop -> preview tiles -> Extract (x4) -> Scale By Placeholder (x4) -> Tile Collect -> preview upscaled -> Tile Stitch -> preview + Save + print size.\n\nReplace each Tile Scale By / Placeholder with your GPT-Image-2 or NB2 upscaler node.\ntile_metadata flows linearly: TileCropAM -> TileCollectAM (passthrough) -> TileStitchAM.\nTile Crop is fixed at 2x2."
       ]
     },
     {
@@ -43,7 +43,7 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "UPSCALER QUICK REFERENCE\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nNB2 (Nano Banana 2)\n  Method: nb2 | Grid: 2\u00d72 | Overlap: 20% | Feather: strong | Color match: ON\n  Prompt: YES \u2014 connect the same prompt to every NB2 node. Describe the output style and detail level.\n  Tip: pass the original image as reference to anchor the regeneration.\n\nGPT-Image-2\n  Method: image_2 | Grid: 2\u00d72 | Overlap: 20% | Feather: strong | Color match: ON\n  Prompt: YES \u2014 same prompt to all tiles + optional reference image input.\n\nTopaz (Photo AI / Sharpen AI)\n  Method: topaz | Grid: 2\u00d72 | Overlap: 8% | Feather: minimal | Color match: OFF\n  Prompt: none. If seams appear \u2192 raise overlap to 15%, set feather_mode_override = medium in Tile Stitch.\n\nSeedVR2\n  Method: seedv2 | Grid: 2\u00d73 | Overlap: 10\u201320% | Feather: strong | Color match: ON\n  Prompt: none. 2\u00d73 grid gives square-ish tiles (model was trained on landscape video frames).\n  If seams persist \u2192 raise overlap to 20%.\n\nESRGAN / RealESRGAN\n  Method: topaz or passthrough | Grid: 2\u00d72 (or batch mode) | Feather: minimal | Color match: OFF\n  Prompt: none. These models accept a full batch \u2014 you can skip Extract/Collect entirely.\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nPROMPT TIPS (regenerative models \u2014 NB2, GPT-Image-2)\n  \u2022 Same prompt to ALL tiles \u2014 diverging prompts cause seams feathering cannot fix\n  \u2022 Describe the output, not the input  (e.g. 'sharp portrait, fine skin texture, soft light')\n  \u2022 Pass the original image as a reference / style input to keep regeneration anchored\n  \u2022 If color looks inconsistent between tiles \u2192 color_match_override = on in Tile Stitch"
+        "UPSCALER QUICK REFERENCE\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nNB2 (Nano Banana 2)\n  Method: nb2 | Grid: 2\u00d72 | Overlap: 20% | Feather: strong | Color match: ON\n  Prompt: YES \u2014 connect the same prompt to every NB2 node. Describe the output style and detail level.\n  Tip: pass the original image as reference to anchor the regeneration.\n\nGPT-Image-2\n  Method: image_2 | Grid: 2\u00d72 | Overlap: 20% | Feather: strong | Color match: ON\n  Prompt: YES \u2014 same prompt to all tiles + optional reference image input.\n\nTopaz (Photo AI / Sharpen AI)\n  Method: topaz | Grid: 2\u00d72 | Overlap: 8% | Feather: minimal | Color match: OFF\n  Prompt: none. If seams appear \u2192 raise overlap to 15%, set feather_mode_override = medium in Tile Stitch.\n\nSeedVR2\n  Method: seedv2 | Grid: 2\u00d72 | Overlap: 10\u201320% | Feather: strong | Color match: ON\n  Prompt: none.\n  If seams persist \u2192 raise overlap to 20%.\n\nESRGAN / RealESRGAN\n  Method: topaz or passthrough | Grid: 2\u00d72 (or batch mode) | Feather: minimal | Color match: OFF\n  Prompt: none. These models accept a full batch \u2014 you can skip Extract/Collect entirely.\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nPROMPT TIPS (regenerative models \u2014 NB2, GPT-Image-2)\n  \u2022 Same prompt to ALL tiles \u2014 diverging prompts cause seams feathering cannot fix\n  \u2022 Describe the output, not the input  (e.g. 'sharp portrait, fine skin texture, soft light')\n  \u2022 Pass the original image as a reference / style input to keep regeneration anchored\n  \u2022 If color looks inconsistent between tiles \u2192 color_match_override = on in Tile Stitch"
       ]
     },
     {
@@ -113,9 +113,7 @@
             4,
             5,
             6,
-            7,
-            8,
-            9
+            7
           ]
         },
         {
@@ -136,8 +134,8 @@
       },
       "widgets_values": [
         "image_2",
-        "3\u00d72 \u2014 landscape tiles",
-        3,
+        "fixed 2\u00d72",
+        2,
         2,
         -1.0,
         0,
@@ -197,7 +195,7 @@
           "name": "tile",
           "type": "IMAGE",
           "links": [
-            10
+            8
           ]
         },
         {
@@ -239,7 +237,7 @@
           "name": "tile",
           "type": "IMAGE",
           "links": [
-            11
+            9
           ]
         },
         {
@@ -281,7 +279,7 @@
           "name": "tile",
           "type": "IMAGE",
           "links": [
-            12
+            10
           ]
         },
         {
@@ -323,7 +321,7 @@
           "name": "tile",
           "type": "IMAGE",
           "links": [
-            13
+            11
           ]
         },
         {
@@ -341,86 +339,78 @@
     },
     {
       "id": 10,
-      "type": "TileExtractAM",
+      "type": "TileScaleByAM",
       "pos": [
-        740,
-        690
+        1040,
+        210
       ],
       "size": {
-        "0": 240,
-        "1": 90
+        "0": 280,
+        "1": 100
       },
       "flags": {},
-      "order": 2,
+      "order": 3,
       "mode": 0,
       "inputs": [
         {
-          "name": "tiles",
+          "name": "image",
           "type": "IMAGE",
           "link": 8
         }
       ],
       "outputs": [
         {
-          "name": "tile",
+          "name": "image",
           "type": "IMAGE",
           "links": [
-            14
+            12
           ]
-        },
-        {
-          "name": "tile_index",
-          "type": "INT",
-          "links": null
         }
       ],
       "properties": {
-        "Node name for S&R": "TileExtractAM"
+        "Node name for S&R": "TileScaleByAM"
       },
       "widgets_values": [
-        4
+        2.0,
+        "lanczos"
       ]
     },
     {
       "id": 11,
-      "type": "TileExtractAM",
+      "type": "TileScaleByAM",
       "pos": [
-        740,
-        810
+        1040,
+        330
       ],
       "size": {
-        "0": 240,
-        "1": 90
+        "0": 280,
+        "1": 100
       },
       "flags": {},
-      "order": 2,
+      "order": 3,
       "mode": 0,
       "inputs": [
         {
-          "name": "tiles",
+          "name": "image",
           "type": "IMAGE",
           "link": 9
         }
       ],
       "outputs": [
         {
-          "name": "tile",
+          "name": "image",
           "type": "IMAGE",
           "links": [
-            15
+            13
           ]
-        },
-        {
-          "name": "tile_index",
-          "type": "INT",
-          "links": null
         }
       ],
       "properties": {
-        "Node name for S&R": "TileExtractAM"
+        "Node name for S&R": "TileScaleByAM"
       },
       "widgets_values": [
-        5
+        2.0,
+        "lanczos"
       ]
     },
     {
@@ -428,7 +418,7 @@
       "type": "TileScaleByAM",
       "pos": [
         1040,
-        210
+        450
       ],
       "size": {
         "0": 280,
@@ -449,7 +439,7 @@
           "name": "image",
           "type": "IMAGE",
           "links": [
-            16
+            14
           ]
         }
       ],
@@ -466,7 +456,7 @@
       "type": "TileScaleByAM",
       "pos": [
         1040,
-        330
+        570
       ],
       "size": {
         "0": 280,
@@ -487,7 +477,7 @@
           "name": "image",
           "type": "IMAGE",
           "links": [
-            17
+            15
           ]
         }
       ],
@@ -501,158 +491,6 @@
     },
     {
       "id": 14,
-      "type": "TileScaleByAM",
-      "pos": [
-        1040,
-        450
-      ],
-      "size": {
-        "0": 280,
-        "1": 100
-      },
-      "flags": {},
-      "order": 3,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "link": 12
-        }
-      ],
-      "outputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "links": [
-            18
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "TileScaleByAM"
-      },
-      "widgets_values": [
-        2.0,
-        "lanczos"
-      ]
-    },
-    {
-      "id": 15,
-      "type": "TileScaleByAM",
-      "pos": [
-        1040,
-        570
-      ],
-      "size": {
-        "0": 280,
-        "1": 100
-      },
-      "flags": {},
-      "order": 3,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "link": 13
-        }
-      ],
-      "outputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "links": [
-            19
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "TileScaleByAM"
-      },
-      "widgets_values": [
-        2.0,
-        "lanczos"
-      ]
-    },
-    {
-      "id": 16,
-      "type": "TileScaleByAM",
-      "pos": [
-        1040,
-        690
-      ],
-      "size": {
-        "0": 280,
-        "1": 100
-      },
-      "flags": {},
-      "order": 3,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "link": 14
-        }
-      ],
-      "outputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "links": [
-            20
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "TileScaleByAM"
-      },
-      "widgets_values": [
-        2.0,
-        "lanczos"
-      ]
-    },
-    {
-      "id": 17,
-      "type": "TileScaleByAM",
-      "pos": [
-        1040,
-        810
-      ],
-      "size": {
-        "0": 280,
-        "1": 100
-      },
-      "flags": {},
-      "order": 3,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "link": 15
-        }
-      ],
-      "outputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "links": [
-            21
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "TileScaleByAM"
-      },
-      "widgets_values": [
-        2.0,
-        "lanczos"
-      ]
-    },
-    {
-      "id": 18,
       "type": "TileCollectAM",
       "pos": [
         1380,
@@ -660,7 +498,7 @@
       ],
       "size": {
         "0": 330,
-        "1": 440
+        "1": 360
       },
       "flags": {},
       "order": 4,
@@ -669,7 +507,7 @@
         {
           "name": "tile_0",
           "type": "IMAGE",
-          "link": 16
+          "link": 12
         },
         {
           "name": "tile_metadata",
@@ -679,27 +517,17 @@
         {
           "name": "tile_1",
           "type": "IMAGE",
-          "link": 17
+          "link": 13
         },
         {
           "name": "tile_2",
           "type": "IMAGE",
-          "link": 18
+          "link": 14
         },
         {
           "name": "tile_3",
           "type": "IMAGE",
-          "link": 19
-        },
-        {
-          "name": "tile_4",
-          "type": "IMAGE",
-          "link": 20
-        },
-        {
-          "name": "tile_5",
-          "type": "IMAGE",
-          "link": 21
+          "link": 15
         }
       ],
       "outputs": [
@@ -707,8 +535,8 @@
           "name": "tiles",
           "type": "IMAGE",
           "links": [
-            22,
-            23
+            16,
+            17
           ]
         },
         {
@@ -725,7 +553,7 @@
           "name": "tile_metadata",
           "type": "STRING",
           "links": [
-            24
+            18
           ]
         }
       ],
@@ -735,11 +563,11 @@
       "widgets_values": []
     },
     {
-      "id": 19,
+      "id": 15,
       "type": "PreviewImage",
       "pos": [
         1380,
-        730
+        650
       ],
       "size": {
         "0": 330,
@@ -752,7 +580,7 @@
         {
           "name": "images",
           "type": "IMAGE",
-          "link": 22
+          "link": 16
         }
       ],
       "outputs": [],
@@ -762,7 +590,7 @@
       "widgets_values": []
     },
     {
-      "id": 20,
+      "id": 16,
       "type": "TileStitchAM",
       "pos": [
         1760,
@@ -779,12 +607,12 @@
         {
           "name": "tiles",
           "type": "IMAGE",
-          "link": 23
+          "link": 17
         },
         {
           "name": "tile_metadata",
           "type": "STRING",
-          "link": 24
+          "link": 18
         }
       ],
       "outputs": [
@@ -792,8 +620,8 @@
           "name": "stitched_image",
           "type": "IMAGE",
           "links": [
-            25,
-            26
+            19,
+            20
           ]
         }
       ],
@@ -806,7 +634,7 @@
       ]
     },
     {
-      "id": 21,
+      "id": 17,
       "type": "PreviewImage",
       "pos": [
         2110,
@@ -823,7 +651,7 @@
         {
           "name": "images",
           "type": "IMAGE",
-          "link": 25
+          "link": 19
         }
       ],
       "outputs": [],
@@ -833,7 +661,7 @@
       "widgets_values": []
     },
     {
-      "id": 22,
+      "id": 18,
       "type": "SaveImageWithDPI",
       "pos": [
         2110,
@@ -850,7 +678,7 @@
         {
           "name": "image",
           "type": "IMAGE",
-          "link": 26
+          "link": 20
         }
       ],
       "outputs": [
@@ -863,7 +691,7 @@
           "name": "print_size_info",
           "type": "STRING",
           "links": [
-            27
+            21
           ]
         }
       ],
@@ -879,7 +707,7 @@
       ]
     },
     {
-      "id": 23,
+      "id": 19,
       "type": "ShowTextAM",
       "pos": [
         2110,
@@ -896,7 +724,7 @@
         {
           "name": "text",
           "type": "STRING",
-          "link": 27
+          "link": 21
         }
       ],
       "outputs": [
@@ -933,7 +761,7 @@
       3,
       4,
       1,
-      18,
+      14,
       1,
       "STRING"
     ],
@@ -971,98 +799,98 @@
     ],
     [
       8,
-      4,
-      0,
-      10,
-      0,
-      "IMAGE"
-    ],
-    [
-      9,
-      4,
-      0,
-      11,
-      0,
-      "IMAGE"
-    ],
-    [
-      10,
       6,
       0,
-      12,
-      0,
-      "IMAGE"
-    ],
-    [
-      11,
-      7,
-      0,
-      13,
-      0,
-      "IMAGE"
-    ],
-    [
-      12,
-      8,
-      0,
-      14,
-      0,
-      "IMAGE"
-    ],
-    [
-      13,
-      9,
-      0,
-      15,
-      0,
-      "IMAGE"
-    ],
-    [
-      14,
       10,
       0,
-      16,
-      0,
       "IMAGE"
     ],
     [
-      15,
+      9,
+      7,
+      0,
       11,
       0,
-      17,
-      0,
       "IMAGE"
     ],
     [
-      16,
+      10,
+      8,
+      0,
       12,
       0,
-      18,
+      "IMAGE"
+    ],
+    [
+      11,
+      9,
+      0,
+      13,
       0,
       "IMAGE"
     ],
     [
-      17,
-      13,
+      12,
+      10,
       0,
-      18,
+      14,
+      0,
+      "IMAGE"
+    ],
+    [
+      13,
+      11,
+      0,
+      14,
       2,
       "IMAGE"
     ],
     [
-      18,
       14,
+      12,
       0,
-      18,
+      14,
       3,
       "IMAGE"
     ],
     [
-      19,
+      15,
+      13,
+      0,
+      14,
+      4,
+      "IMAGE"
+    ],
+    [
+      16,
+      14,
+      0,
       15,
       0,
+      "IMAGE"
+    ],
+    [
+      17,
+      14,
+      0,
+      16,
+      0,
+      "IMAGE"
+    ],
+    [
       18,
-      4,
+      14,
+      3,
+      16,
+      1,
+      "STRING"
+    ],
+    [
+      19,
+      16,
+      0,
+      17,
+      0,
       "IMAGE"
     ],
     [
@@ -1070,62 +898,14 @@
       16,
       0,
       18,
-      5,
+      0,
       "IMAGE"
     ],
     [
       21,
-      17,
-      0,
       18,
-      6,
-      "IMAGE"
-    ],
-    [
-      22,
-      18,
-      0,
+      1,
       19,
-      0,
-      "IMAGE"
-    ],
-    [
-      23,
-      18,
-      0,
-      20,
-      0,
-      "IMAGE"
-    ],
-    [
-      24,
-      18,
-      3,
-      20,
-      1,
-      "STRING"
-    ],
-    [
-      25,
-      20,
-      0,
-      21,
-      0,
-      "IMAGE"
-    ],
-    [
-      26,
-      20,
-      0,
-      22,
-      0,
-      "IMAGE"
-    ],
-    [
-      27,
-      22,
-      1,
-      23,
       0,
       "STRING"
     ]
