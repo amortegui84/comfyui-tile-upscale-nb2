@@ -59,9 +59,9 @@ METHOD_PRESETS: dict[str, dict] = {
         "recommended_overlap_pct": 10.0,
         "feather_mode": "strong",
         "color_match": True,
-        "recommended_cols": 2,
+        "recommended_cols": 3,
         "recommended_rows": 2,
-        "description": "SeedV2-style faithful upscale — fixed 2x2 tiles, color match on",
+        "description": "SeedVR2-style faithful upscale - 3x2 tiles, color match on",
     },
     "passthrough": {
         "category": "passthrough",
@@ -85,10 +85,15 @@ METHOD_PRESETS: dict[str, dict] = {
     },
 }
 
-# Grid presets are intentionally fixed. Keep the old input names for saved
-# workflow compatibility, but do not expose alternate layouts in the UI.
+# Keep old input names for saved workflow compatibility, but allow the layouts
+# used by SeedVR2 tile workflows.
 GRID_PRESETS: dict[str, tuple[int, int] | None] = {
+    "method default": None,
+    "fixed 2x2": (2, 2),
     "fixed 2×2": (2, 2),
+    "3x2 horizontal": (3, 2),
+    "2x3 vertical": (2, 3),
+    "3x3": (3, 3),
 }
 
 # Smoothstep power per feather mode.
@@ -96,9 +101,53 @@ GRID_PRESETS: dict[str, tuple[int, int] | None] = {
 # Lower power (1.0 = linear) = softer, wider transition.
 _FEATHER_POWER = {"strong": 1.0, "medium": 2.0, "minimal": 4.0}
 MAX_COLLECT_TILES = 24
-FIXED_GRID_COLS = 2
-FIXED_GRID_ROWS = 2
-FIXED_TILE_COUNT = FIXED_GRID_COLS * FIXED_GRID_ROWS
+
+
+def _normalize_grid_label(label: str) -> str:
+    return str(label).strip().lower().replace("×", "x")
+
+
+def _resolve_grid(method: str, grid_preset: str, grid_cols: int, grid_rows: int) -> tuple[int, int, str]:
+    preset = METHOD_PRESETS[method]
+    label = _normalize_grid_label(grid_preset)
+
+    if label in ("method default", "auto"):
+        cols = int(preset["recommended_cols"])
+        rows = int(preset["recommended_rows"])
+        policy = "method_default"
+    elif label in ("fixed 2x2", "2x2"):
+        cols, rows = 2, 2
+        policy = "preset"
+    elif label in ("3x2 horizontal", "3x2"):
+        cols, rows = 3, 2
+        policy = "preset"
+    elif label in ("2x3 vertical", "2x3"):
+        cols, rows = 2, 3
+        policy = "preset"
+    elif label in ("3x3", "9 tiles", "9_tiles"):
+        cols, rows = 3, 3
+        policy = "preset"
+    else:
+        cols, rows = int(grid_cols), int(grid_rows)
+        policy = "custom"
+
+    cols = max(1, min(cols, 8))
+    rows = max(1, min(rows, 8))
+    return cols, rows, policy
+
+
+def _uniform_tile_size(src_size: int, count: int, overlap_fraction: float) -> int:
+    if count <= 1:
+        return src_size
+    coverage = 1.0 + (count - 1) * (1.0 - overlap_fraction)
+    return max(1, min(src_size, int(np.ceil(src_size / coverage))))
+
+
+def _tile_starts(src_size: int, tile_size: int, count: int) -> list[int]:
+    if count <= 1:
+        return [0]
+    max_start = max(0, src_size - tile_size)
+    return [round(i * max_start / (count - 1)) for i in range(count)]
 
 
 # ── Image helpers ──────────────────────────────────────────────────────────────
@@ -161,6 +210,42 @@ def _feather_mask(h: int, w: int, ov_h: int, ov_w: int, power: float) -> np.ndar
     """
     row_w = _smoothstep_ramp(h, ov_h, power)
     col_w = _smoothstep_ramp(w, ov_w, power)
+    return np.outer(row_w, col_w)
+
+
+def _edge_feather_axis(
+    n: int,
+    overlap: int,
+    power: float,
+    fade_start: bool,
+    fade_end: bool,
+) -> np.ndarray:
+    ramp = np.ones(n, dtype=np.float64)
+    if overlap <= 0:
+        return ramp
+    overlap = min(overlap, n // 2)
+    t = np.linspace(0.0, 1.0, overlap, endpoint=False)
+    fade = np.power(t, 1.0 / power)
+    if fade_start:
+        ramp[:overlap] *= fade
+    if fade_end:
+        ramp[-overlap:] *= fade[::-1]
+    return ramp
+
+
+def _tile_feather_mask(
+    h: int,
+    w: int,
+    ov_h: int,
+    ov_w: int,
+    power: float,
+    row: int,
+    col: int,
+    rows: int,
+    cols: int,
+) -> np.ndarray:
+    row_w = _edge_feather_axis(h, ov_h, power, row > 0, row < rows - 1)
+    col_w = _edge_feather_axis(w, ov_w, power, col > 0, col < cols - 1)
     return np.outer(row_w, col_w)
 
 
@@ -238,14 +323,14 @@ class TileCropAM:
                 "grid_preset": (
                     list(GRID_PRESETS.keys()),
                     {
-                        "default": "fixed 2×2",
-                        "tooltip": "Fixed 2x2 layout. This node always outputs exactly 4 tiles.",
+                        "default": "method default",
+                        "tooltip": "Grid layout. Method default uses each method preset recommendation.",
                     },
                 ),
-                "grid_cols": ("INT", {"default": 2, "min": 2, "max": 2, "step": 1,
-                                      "tooltip": "Fixed at 2 columns."}),
-                "grid_rows": ("INT", {"default": 2, "min": 2, "max": 2, "step": 1,
-                                      "tooltip": "Fixed at 2 rows."}),
+                "grid_cols": ("INT", {"default": 3, "min": 1, "max": 8, "step": 1,
+                                      "tooltip": "Used when grid_preset is custom/unknown."}),
+                "grid_rows": ("INT", {"default": 2, "min": 1, "max": 8, "step": 1,
+                                      "tooltip": "Used when grid_preset is custom/unknown."}),
                 "overlap_percent": (
                     "FLOAT",
                     {
@@ -306,22 +391,25 @@ class TileCropAM:
         requested_grid_rows = int(grid_rows)
         requested_grid_preset = grid_preset
 
-        # Always use a fixed 2x2 contract. The grid_* parameters remain in the
-        # function signature only so older saved workflows keep loading.
-        grid_cols, grid_rows = FIXED_GRID_COLS, FIXED_GRID_ROWS
+        grid_cols, grid_rows, tile_count_policy = _resolve_grid(
+            method, grid_preset, grid_cols, grid_rows
+        )
 
         eff_overlap = overlap_percent if overlap_percent >= 0.0 else preset["recommended_overlap_pct"]
+        overlap_fraction = max(0.0, min(float(eff_overlap) / 100.0, 0.75))
 
-        # Base tile size (integer division — image need not divide evenly).
-        base_w = src_w // grid_cols
-        base_h = src_h // grid_rows
+        tile_w = _uniform_tile_size(src_w, grid_cols, overlap_fraction)
+        tile_h = _uniform_tile_size(src_h, grid_rows, overlap_fraction)
+        xs = _tile_starts(src_w, tile_w, grid_cols)
+        ys = _tile_starts(src_h, tile_h, grid_rows)
 
-        # Overlap in pixels (full overlap zone; each tile extends by half on each side).
-        ov_w = int(base_w * eff_overlap / 100.0)
-        ov_h = int(base_h * eff_overlap / 100.0)
-        # Force even so half-overlap is exact integers.
-        ov_w = (ov_w // 2) * 2
-        ov_h = (ov_h // 2) * 2
+        # Nominal overlap in pixels for feathering. Actual start positions are
+        # stored per tile and used for exact placement during stitch.
+        ov_w = max(0, round(tile_w * overlap_fraction))
+        ov_h = max(0, round(tile_h * overlap_fraction))
+
+        base_w = tile_w
+        base_h = tile_h
 
         # Build tile crop regions.
         tile_infos: list[dict] = []
@@ -329,19 +417,10 @@ class TileCropAM:
 
         for row in range(grid_rows):
             for col in range(grid_cols):
-                x0 = col * base_w - (ov_w // 2 if col > 0 else 0)
-                y0 = row * base_h - (ov_h // 2 if row > 0 else 0)
-                x1 = (col + 1) * base_w + (ov_w // 2 if col < grid_cols - 1 else 0)
-                y1 = (row + 1) * base_h + (ov_h // 2 if row < grid_rows - 1 else 0)
-
-                # Last column / row: snap to image edge to cover any remainder pixels.
-                if col == grid_cols - 1:
-                    x1 = src_w
-                if row == grid_rows - 1:
-                    y1 = src_h
-
-                x0, y0 = max(0, x0), max(0, y0)
-                x1, y1 = min(src_w, x1), min(src_h, y1)
+                x0 = xs[col]
+                y0 = ys[row]
+                x1 = min(src_w, x0 + tile_w)
+                y1 = min(src_h, y0 + tile_h)
 
                 crop = src_np[y0:y1, x0:x1]
 
@@ -380,7 +459,8 @@ class TileCropAM:
             "requested_grid_rows": requested_grid_rows,
             "grid_cols": grid_cols,
             "grid_rows": grid_rows,
-            "tile_count_policy": "fixed_2x2",
+            "tile_count_policy": tile_count_policy,
+            "grid_preset": grid_preset,
             "overlap_pct": eff_overlap,
             "overlap_w": ov_w,
             "overlap_h": ov_h,
@@ -489,6 +569,50 @@ class TileScaleByAM:
             pil_resized = _np_to_pil(np_img).resize((new_w, new_h), pil_method)
             results.append(_np2t(_pil_to_np(pil_resized)))
         return (torch.stack(results, dim=0),)
+
+
+class TileSeedVR2ControlsAM:
+    """
+    Reusable decimal controls for SeedVR2 tile workflows.
+
+    Connect upscale_factor and noise_scale to every SeedVR2 tile node so all
+    tiles use the same values.
+    """
+
+    CATEGORY = "AM/TileUpscale"
+    RETURN_TYPES = ("FLOAT", "FLOAT")
+    RETURN_NAMES = ("upscale_factor", "noise_scale")
+    FUNCTION = "controls"
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "upscale_factor": (
+                    "FLOAT",
+                    {
+                        "default": 2.0,
+                        "min": 0.1,
+                        "max": 16.0,
+                        "step": 0.05,
+                        "tooltip": "SeedVR2 upscale factor shared by all tile nodes.",
+                    },
+                ),
+                "noise_scale": (
+                    "FLOAT",
+                    {
+                        "default": 0.15,
+                        "min": 0.0,
+                        "max": 1.0,
+                        "step": 0.01,
+                        "tooltip": "SeedVR2 noise scale shared by all tile nodes.",
+                    },
+                ),
+            },
+        }
+
+    def controls(self, upscale_factor: float, noise_scale: float):
+        return (float(upscale_factor), float(noise_scale))
 
 
 class TileCollectAM:
@@ -622,6 +746,16 @@ class TileStitchAM:
                         "tooltip": "auto = use method preset feather mode.",
                     },
                 ),
+                "upscale_factor": (
+                    "FLOAT",
+                    {
+                        "default": 0.0,
+                        "min": 0.0,
+                        "max": 16.0,
+                        "step": 0.05,
+                        "tooltip": "Optional explicit output scale. 0 = infer from processed tile size.",
+                    },
+                ),
             },
         }
 
@@ -633,6 +767,7 @@ class TileStitchAM:
         tile_metadata: str,
         color_match_override: str = "auto",
         feather_mode_override: str = "auto",
+        upscale_factor: float = 0.0,
     ):
         meta = json.loads(tile_metadata)
         preset: dict = meta["preset"]
@@ -644,6 +779,8 @@ class TileStitchAM:
         ov_h: int = meta["overlap_h"]
         unif_w: int = meta["uniform_tile_w"]
         unif_h: int = meta["uniform_tile_h"]
+        grid_cols: int = meta.get("grid_cols", 1)
+        grid_rows: int = meta.get("grid_rows", 1)
 
         n_tiles = tiles.shape[0]
         if n_tiles != len(tile_infos):
@@ -652,10 +789,14 @@ class TileStitchAM:
                 f"{len(tile_infos)}. Check your tile count."
             )
 
-        # Determine upscale factor from processed tile size vs uniform tile size.
+        # Determine upscale factor from processed tile size vs uniform tile size,
+        # unless an explicit workflow factor is connected for deterministic sizing.
         proc_h, proc_w = tiles.shape[1], tiles.shape[2]
-        scale_x = proc_w / unif_w
-        scale_y = proc_h / unif_h
+        if upscale_factor > 0.0:
+            scale_x = scale_y = float(upscale_factor)
+        else:
+            scale_x = proc_w / unif_w
+            scale_y = proc_h / unif_h
 
         canvas_w = round(src_w * scale_x)
         canvas_h = round(src_h * scale_y)
@@ -698,9 +839,19 @@ class TileStitchAM:
             # Resize processed tile to exactly fit destination region.
             tile_r = _resize_np(tile_np, dst_w, dst_h)
 
-            # Build feather weight mask for this tile.
-            # Overlap is applied symmetrically; normalisation handles edge tiles.
-            feather = _feather_mask(dst_h, dst_w, ov_h_s, ov_w_s, power)
+            # Build an edge-aware feather mask. Image-boundary edges stay fully
+            # weighted; only edges with neighboring tiles fade into overlaps.
+            feather = _tile_feather_mask(
+                dst_h,
+                dst_w,
+                ov_h_s,
+                ov_w_s,
+                power,
+                int(tinfo.get("row", 0)),
+                int(tinfo.get("col", 0)),
+                grid_rows,
+                grid_cols,
+            )
 
             # Optional: colour-match tile to already-placed canvas in overlap zone.
             if do_color_match:
@@ -1022,6 +1173,7 @@ NODE_CLASS_MAPPINGS: dict[str, type] = {
     "TileCropAM": TileCropAM,
     "TileExtractAM": TileExtractAM,
     "TileScaleByAM": TileScaleByAM,
+    "TileSeedVR2ControlsAM": TileSeedVR2ControlsAM,
     "TileCollectAM": TileCollectAM,
     "TileStitchAM": TileStitchAM,
     "TileInfoAM": TileInfoAM,
@@ -1033,6 +1185,7 @@ NODE_DISPLAY_NAME_MAPPINGS: dict[str, str] = {
     "TileCropAM": "1. Tile Crop (AM)",
     "TileExtractAM": "2. Tile Extract (AM)",
     "TileScaleByAM": "3. Tile Scale By / Placeholder (AM)",
+    "TileSeedVR2ControlsAM": "SeedVR2 Factor / Noise Controls (AM)",
     "TileCollectAM": "4. Tile Collect (AM)",
     "TileStitchAM": "5. Tile Stitch (AM)",
     "TileInfoAM": "Tile Info / Debug (AM)",

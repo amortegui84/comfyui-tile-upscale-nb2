@@ -2,199 +2,133 @@
 
 Method-aware tile upscale nodes for ComfyUI.
 
-Split an image into overlapping tiles, process each tile with your upscaler of choice (NB2, GPT-Image-2, Topaz, SeedVR2, ESRGAN, or any other), then stitch them back into one seamless image. Feathering and optional color matching are applied automatically based on the selected method preset.
-
-## Install
-
-```bash
-cd ComfyUI/custom_nodes
-git clone https://github.com/amortegui84/comfyui-tile-upscale-AM
-```
-
-Restart ComfyUI after installing or updating.
+The nodes split one image into overlapping tiles, let you process each tile with
+an upscaler such as SeedVR2, NB2, GPT-Image-2, Topaz, ESRGAN, or another image
+upscaler, then stitch the processed tiles back into one image using the saved
+tile geometry.
 
 ## Nodes
 
-Nodes appear in the **AM/TileUpscale** category, numbered in pipeline order.
+Nodes appear in the `AM/TileUpscale` category.
 
-### 1. Tile Crop (AM)
-
-Splits the source image into a row-major IMAGE batch and emits JSON metadata that carries the tile geometry through the rest of the pipeline.
-
-| Input | Description |
+| Node | Purpose |
 |---|---|
-| `image` | Source image |
-| `method` | Blend preset: `nb2`, `image_2`, `topaz`, `seedv2`, `passthrough`, `custom` |
-| `grid_preset` | Fixed at `2×2`. The node always outputs exactly 4 tiles. |
-| `grid_cols`, `grid_rows` | Fixed at `2` for saved-workflow compatibility |
-| `overlap_percent` | `-1` uses the method preset default |
-| `target_tile_width/height` | Optional: force a uniform output tile size |
+| `Tile Crop (AM)` | Splits the source image into a row-major IMAGE batch and emits JSON tile metadata. |
+| `Tile Extract (AM)` | Extracts one tile from the batch by zero-based row-major index. |
+| `Tile Scale By / Placeholder (AM)` | Test upscaler that scales an image by a decimal factor. Replace it with your real upscaler. |
+| `SeedVR2 Factor / Noise Controls (AM)` | Reusable decimal outputs for SeedVR2 `upscale_factor` and `noise_scale`. |
+| `Tile Collect (AM)` | Collects processed tiles back into one IMAGE batch and validates the count when metadata is connected. |
+| `Tile Stitch (AM)` | Reconstructs the final image from processed tiles and metadata. |
+| `Tile Info / Debug (AM)` | Shows metadata for one tile. |
+| `Save Image With DPI (AM)` | Saves PNG, TIFF, or JPEG with DPI metadata. |
 
-| Output | Description |
-|---|---|
-| `tiles` | IMAGE batch (N tiles) |
-| `tile_metadata` | JSON string — wire to Tile Collect (AM) |
-| `tile_count` | Total number of tiles |
+## Supported Tile Layouts
 
-### 2. Tile Extract (AM)
+`Tile Crop (AM)` supports these presets:
 
-Extracts one tile from the batch by row-major index. Use this when your upscaler processes one image per call (e.g. NB2, GPT-Image-2 API).
+| Preset | Tiles | Order |
+|---|---:|---|
+| `fixed 2x2` / `fixed 2×2` | 4 | `0 1 / 2 3` |
+| `3x2 horizontal` | 6 | `0 1 2 / 3 4 5` |
+| `2x3 vertical` | 6 | `0 1 / 2 3 / 4 5` |
+| `3x3` | 9 | `0 1 2 / 3 4 5 / 6 7 8` |
+| `method default` | Method dependent | SeedVR2 defaults to `3x2 horizontal`; most other methods default to `2x2`. |
 
-| Index layout | 2×2 | 3×3 |
-|---|---|---|
-| Row 0 | 0 1 | 0 1 2 |
-| Row 1 | 2 3 | 3 4 5 |
-| Row 2 | — | 6 7 8 |
+Tile order is always row-major: left to right across the first row, then the
+next row, until the bottom-right tile.
 
-### 3. Tile Scale By / Placeholder (AM)
+Use `3x2 horizontal` for most landscape or wide images, and for the default
+SeedVR2 workflow. It gives six tiles with more horizontal coverage while keeping
+the workflow manageable.
 
-A runnable stand-in for your real upscaler. Use it to confirm that tiling and stitching work correctly before connecting your actual model. When ready, replace each `TileScaleByAM` node with your upscaler — the rest of the workflow stays identical.
+Use `2x3 vertical` for portrait images where a horizontal grid would produce
+overly wide tile crops.
 
-| Input | Description |
-|---|---|
-| `image` | Tile image |
-| `scale_factor` | Multiply dimensions by this factor (e.g. `2.0` = double resolution) |
-| `upscale_method` | `lanczos`, `bicubic`, `bilinear`, `nearest` |
+Use `3x3` when you need more local detail, larger output sizes, or better
+coverage for difficult images. It costs more processing time because every
+upscaler node runs nine times.
 
-### 4. Tile Collect (AM)
+## Aspect Ratio
 
-Collects processed per-tile images back into one IMAGE batch. Connect tiles in the same row-major order emitted by Tile Crop. The `tile_metadata` input is optional but enables count validation.
+`Tile Crop (AM)` computes uniform source crop windows for the selected grid and
+stores exact source coordinates in metadata. `Tile Stitch (AM)` uses those
+coordinates to reconstruct the final canvas, so 3x2, 2x3, and 3x3 layouts
+preserve the original image aspect ratio. The final size is inferred from the
+processed tile size relative to the original tile size.
 
-**Tip:** Wire `tile_metadata` from Tile Collect's output (slot 3) to Tile Stitch — this keeps the pipeline linear and avoids a second wire from Tile Crop.
-
-| Output | Description |
-|---|---|
-| `tiles` | Collected tile batch |
-| `tile_count` | Number of connected tiles |
-| `info` | JSON summary and warnings |
-| `tile_metadata` | Passthrough — wire directly to Tile Stitch (AM) |
-
-### 5. Tile Stitch (AM)
-
-Stitches the processed tile batch into one seamless image. The upscale factor is detected automatically from the processed tile dimensions — no manual scale input required.
-
-| Input | Description |
-|---|---|
-| `tiles` | Processed tile batch from Tile Collect (AM) |
-| `tile_metadata` | From Tile Collect (AM) output slot `tile_metadata` |
-| `color_match_override` | `auto` / `on` / `off` — overrides the method preset |
-| `feather_mode_override` | `auto` / `strong` / `medium` / `minimal` |
-
-### Tile Info / Debug (AM)
-
-Inspect tile metadata for a specific index. Shows method, grid layout, source region, tile size, overlap, feather mode, color matching, and warnings.
-
-### Save Image With DPI (AM)
-
-Save the stitched image with embedded DPI metadata. DPI is metadata only — it does not add pixel detail.
-
-DPI options: `72` (screen/web), `150` (draft print), `300` (quality print), `600` (high-res print).
-
-| Format | DPI support |
-|---|---|
-| PNG | pHYs chunk (lossless) |
-| TIFF | Resolution tags (lossless with LZW) |
-| JPEG | APP0/JFIF fields (lossy) |
-
----
-
-## Method Presets
-
-The `method` in Tile Crop selects blend geometry — not which upscaler to use. The upscaler is whatever node you place between Tile Extract and Tile Collect.
-
-| Method | Category | Preset overlap | Default grid | Stitch behavior |
-|---|---|---|---|---|
-| `nb2` | regenerative | 20% | 2×2 | strong feather, color match |
-| `image_2` | regenerative | 20% | 2×2 | strong feather, color match |
-| `topaz` | faithful | 8% | 2×2 | minimal feather, no color match |
-| `seedv2` | faithful | 10% | 2×2 | strong feather, color match |
-| `passthrough` | passthrough | 4% | 2×2 | near-exact placement |
-| `custom` | custom | 12% | 2×2 | medium feather, user-controlled |
-
----
-
-## Upscaler Quick Reference
-
-Choose the row that matches your upscaler. All settings can be adjusted in the nodes listed in the **Where to set it** column.
-
-| Upscaler | Method | Grid | Overlap | Feather | Color match | Prompt / reference |
-|---|---|---|---|---|---|---|
-| **NB2** (Nano Banana 2) | `nb2` | 2×2 | 20% | strong | on | **Yes — required.** Connect the same text prompt to every NB2 node. Describe the subject, style, and level of detail you want. A consistent prompt across all tiles prevents content drift between them. |
-| **GPT-Image-2** | `image_2` | 2×2 | 20% | strong | on | **Yes — recommended.** Connect the same prompt to every Image-2 node. Include a description of the scene plus any style or quality keywords. You can also pass the original image as a reference input to anchor the regeneration. |
-| **Topaz** (Photo AI / Sharpen AI) | `topaz` | 2×2 | 8% | minimal | off | **No prompt.** Topaz is a faithful upscaler — it does not accept text input. If seams appear, raise overlap to 15% and switch `feather_mode_override` to `medium` in Tile Stitch. |
-| **SeedVR2** | `seedv2` | 2×2 | 10–20% | strong | on | **No prompt.** Color match is on by default because SeedVR2 can introduce subtle per-tile brightness drift. If seams are still visible, raise overlap to 20%. |
-| **ESRGAN / RealESRGAN** | `topaz` or `passthrough` | 2×2 or batch | 8% | minimal | off | **No prompt.** These models accept a whole batch, or you can use the fixed 2×2 tile workflow. |
-
-### About prompts for regenerative upscalers (NB2, GPT-Image-2)
-
-Regenerative upscalers re-draw each tile guided by your prompt. A few tips:
-
-- **Same prompt to all tiles.** Use one prompt node and wire it to every upscaler node in the workflow. Diverging prompts cause visible seams that no amount of feathering can fix.
-- **Describe the output, not the input.** Write what you want the final result to look like — `sharp portrait, fine skin texture, soft studio light` — not a description of degradation (`blurry`, `low res`).
-- **Add a reference image when available.** NB2 and GPT-Image-2 both accept an optional reference or style image. Passing the original (or a crop of it) as reference keeps the regeneration anchored to the source content.
-- **Keep style consistent.** If tiles look inconsistent in color or lighting despite a shared prompt, enable `color_match_override = on` in Tile Stitch — it normalizes each tile to match its neighbors before blending.
-
----
-
-## Pipeline
-
-### Per-tile upscaler (NB2, GPT-Image-2, Topaz, etc.)
-
-Each tile is processed independently. Scale factor is inferred automatically at stitch time.
+When `Tile Stitch (AM)` receives an explicit `upscale_factor`, final dimensions
+are deterministic:
 
 ```text
-Load Image
-  └─ Tile Crop (AM)  [method=nb2, grid=2×2]
-       ├─ tiles ──► Tile Extract (AM) [0] ──► [your upscaler] ──► Tile Collect (AM) tile_0
-       ├─ tiles ──► Tile Extract (AM) [1] ──► [your upscaler] ──► Tile Collect (AM) tile_1
-       ├─ tiles ──► Tile Extract (AM) [2] ──► [your upscaler] ──► Tile Collect (AM) tile_2
-       ├─ tiles ──► Tile Extract (AM) [3] ──► [your upscaler] ──► Tile Collect (AM) tile_3
-       └─ tile_metadata ──────────────────────────────────────► Tile Collect (AM)
-
-Tile Collect (AM)
-  ├─ tiles ────────────────────────────────────────────────────► Tile Stitch (AM)
-  └─ tile_metadata ────────────────────────────────────────────► Tile Stitch (AM)
-
-Tile Stitch (AM)
-  ├─► Preview Image
-  └─► Save Image With DPI (AM)
+final width  = input width  x upscale_factor
+final height = input height x upscale_factor
 ```
 
-### Batch upscaler (ESRGAN, RealESRGAN, etc.)
+If `upscale_factor` is left at `0`, Tile Stitch infers the scale from the
+processed tile dimensions. That is useful for fixed-size external upscalers, but
+decimal factors can otherwise introduce one-pixel rounding differences.
 
-If your upscaler accepts a batch of images, skip Extract/Collect entirely.
+## SeedVR2 Workflows
+
+Example workflows are in `workflows/`:
+
+| File | Purpose |
+|---|---|
+| `workflows/workflow example.json` | Existing 6-tile SeedVR2 workflow using `3x2 horizontal`. |
+| `workflows/workflow_example_seedvr2_9_tiles.json` | New 9-tile SeedVR2 workflow using `3x3`. |
+| `workflows/tile_upscale_01_nb2_2x2_4_tiles.json` | Placeholder 4-tile NB2 workflow. |
+| `workflows/tile_upscale_02_image2_2x2_4_tiles.json` | Placeholder 4-tile GPT-Image-2 workflow. |
+| `workflows/tile_upscale_03_faithful_2x2_4_tiles.json` | Placeholder 4-tile faithful upscale workflow. |
+
+For SeedVR2 workflows:
+
+1. Load an image.
+2. Use `Tile Crop (AM)` with `method=seedv2`.
+3. Use `Tile Extract (AM)` nodes for each tile index.
+4. Connect each extracted tile to a SeedVR2 upscaler node.
+5. Connect all SeedVR2 outputs to `Tile Collect (AM)` in row-major order.
+6. Connect `Tile Collect (AM)` `tile_metadata` to `Tile Stitch (AM)`.
+7. Preview or save the stitched image.
+
+## Factor And Noise Controls
+
+Use `SeedVR2 Factor / Noise Controls (AM)` when multiple SeedVR2 nodes need the
+same values:
+
+| Output | Default | Connect to |
+|---|---:|---|
+| `upscale_factor` | `2.0` | Every SeedVR2 `upscale_factor` input |
+| `noise_scale` | `0.15` | Every SeedVR2 `noise_scale` input |
+
+Also connect `upscale_factor` to `Tile Stitch (AM)` when you want exact final
+dimensions from a decimal factor.
+
+The placeholder `Tile Scale By / Placeholder (AM)` also has a decimal
+`scale_factor` input defaulting to `2.0`, useful for validating crop and stitch
+geometry before using SeedVR2.
+
+## Large Print Calculation
+
+For a large print target, convert physical size to inches and multiply by DPI:
 
 ```text
-Load Image
-  └─ Tile Crop (AM)
-       ├─ tiles ─────────────────────────────────────────────────► [batch upscaler]
-       └─ tile_metadata ──────────────────────────────────────────► Tile Stitch (AM)
-
-[batch upscaler] ──► Tile Stitch (AM) ──► Save Image With DPI (AM)
+61 cm / 2.54 = 24.016 in
+24.016 in x 600 DPI = 14,409 px
 ```
 
----
+So a 61 cm print at 600 DPI needs about `14,409 px` on that side. Increase tile
+count and validate the final pixel dimensions before printing.
 
-## Example Workflows
+## Limitations And Assumptions
 
-All three workflows ship with **Tile Scale By / Placeholder (AM)** as the upscaler. Load any of them, confirm the tiling and stitching look correct, then replace each placeholder node with your real upscaler.
-
-| File | Method | Grid | Tiles | Upscaler slot |
-|---|---|---|---|---|
-| `tile_upscale_01_nb2_2x2_4_tiles.json` | `nb2` | 2×2 | 4 | 4× TileScaleByAM |
-| `tile_upscale_02_image2_2x2_4_tiles.json` | `image_2` | 2×2 | 4 | 4× TileScaleByAM |
-| `tile_upscale_03_faithful_2x2_4_tiles.json` | `topaz` | 2×2 | 4 | 4× TileScaleByAM |
-
-Each workflow includes a preview after the crop (see all tiles) and a preview after the collect (see all upscaled tiles before stitching). Tile Crop is fixed at 2×2 so Tile Stitch always receives matching 4-tile metadata.
-
----
-
-## Repository Separation
-
-This project is separate from:
-
-```
-https://github.com/amortegui84/comfyui-inpaint-cropstitch-nb2
-```
-
-That repository handles regional inpaint / crop-stitch workflows. This repository is the tile upscale system.
+- Tile stitching assumes each processed tile preserves its tile aspect ratio.
+- If an upscaler returns slightly different tile sizes, `Tile Collect (AM)`
+  normalizes all tiles to match `tile_0`.
+- Connect `Tile Collect (AM)` inputs without gaps: `tile_0`, `tile_1`,
+  `tile_2`, and so on.
+- Regenerative upscalers can redraw tile content differently. Higher overlap,
+  strong feathering, and color matching can reduce visible seams but cannot
+  fully correct content drift.
+- DPI metadata does not create pixels. Large-format print targets, such as
+  61 cm at 600 DPI, may require increasing tile count and validating the final
+  pixel dimensions before printing.
