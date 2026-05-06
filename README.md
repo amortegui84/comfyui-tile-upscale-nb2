@@ -21,6 +21,7 @@ Nodes appear in the `AM/TileUpscale` category.
 | `Tile Stitch (AM)` | Reconstructs the final image from processed tiles and metadata. |
 | `Tile Info / Debug (AM)` | Shows metadata for one tile. |
 | `Save Image With DPI (AM)` | Saves PNG, TIFF, or JPEG with DPI metadata. |
+| `Tile Cost & Runtime Info (AM)` | Reports estimated API cost and timing at the end of the workflow. |
 
 ## Supported Tile Layouts
 
@@ -106,6 +107,81 @@ dimensions from a decimal factor.
 The placeholder `Tile Scale By / Placeholder (AM)` also has a decimal
 `scale_factor` input defaulting to `2.0`, useful for validating crop and stitch
 geometry before using SeedVR2.
+
+## SeedVR2 / Fal Cost Estimation
+
+`Tile Cost & Runtime Info (AM)` calculates the estimated API cost for a tiled
+SeedVR2 run and displays a summary report at the end of the workflow.
+
+### How Fal billing works
+
+Fal charges **$0.001 per output megapixel** per API call to SeedVR2.  Each tile
+in a tile workflow is a separate API call, so tile count directly multiplies your
+cost.
+
+| Grid | Tiles | API calls |
+|---:|---:|---:|
+| 2×2 | 4 | 4 |
+| 3×2 | 6 | 6 |
+| 3×3 | 9 | 9 |
+
+### Why billed megapixels exceed the final stitched image
+
+Tiles overlap their neighbours.  For a 3×3 grid with 10% overlap, each tile
+includes extra pixels on every shared edge.  Those overlap pixels are processed
+and billed in each adjacent tile's API call, so the total billed megapixels are
+always higher than the final stitched image megapixels.
+
+```text
+cost formula:
+  mp_per_tile     = (tile_source_px × upscale_factor)² ÷ 1,000,000
+  total_billed_mp = mp_per_tile × tile_count
+  fal_cost        = total_billed_mp × price_per_megapixel
+```
+
+### Example — 3×3 SeedVR2 workflow
+
+```text
+Source image:          4096 × 2896 px
+Upscale factor:        2×
+Grid:                  3×3 = 9 tiles
+Overlap:               10%
+
+Uniform tile (source): ~1502 × ~1062 px  (includes overlap)
+Tile output:           ~3004 × ~2124 px
+MP per tile:           3004 × 2124 ÷ 1,000,000 = 6.38 MP
+
+Total billed MP:       6.38 × 9 = 57.4 MP
+Fal cost ($0.001/MP):  57.4 × 0.001 = $0.057
+
+Final stitched image:  8192 × 5792 px = 47.45 MP
+Billed MP vs final:    57.4 MP vs 47.45 MP  (overlap causes ~21% extra billing)
+```
+
+### Server compute estimate (optional)
+
+Server-side stitching and local GPU time are separate from Fal API cost.
+Enable `include_server_estimate` and set `server_cost_per_hour_usd` to add a
+rough estimate based on elapsed time:
+
+```text
+server_cost = elapsed_seconds ÷ 3600 × server_cost_per_hour_usd
+```
+
+Connect `elapsed_seconds` manually or leave it at `0` to show "Not provided."
+
+### Connecting the node
+
+Add `Tile Cost & Runtime Info (AM)` after `Tile Stitch (AM)` and connect:
+
+| Input | Source |
+|---|---|
+| `tile_metadata` | `Tile Collect (AM)` → `tile_metadata` |
+| `stitched_image` | `Tile Stitch (AM)` → `stitched_image` |
+| `tile_count` | `Tile Collect (AM)` → `tile_count` |
+| `upscale_factor` | `SeedVR2 Factor / Noise Controls (AM)` → `upscale_factor` |
+
+The `9-tile` example workflow already includes the node wired up.
 
 ## Large Print Calculation
 

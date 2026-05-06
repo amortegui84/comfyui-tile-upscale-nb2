@@ -1,8 +1,8 @@
 {
   "id": "tile-upscale-seedvr2-3x3-9-tiles",
   "revision": 1,
-  "last_node_id": 25,
-  "last_link_id": 52,
+  "last_node_id": 26,
+  "last_link_id": 56,
   "nodes": [
     {
       "id": 1,
@@ -133,7 +133,8 @@
             35,
             40,
             45,
-            52
+            52,
+            56
           ]
         },
         {
@@ -1164,7 +1165,9 @@
         {
           "name": "tile_count",
           "type": "INT",
-          "links": null
+          "links": [
+            55
+          ]
         },
         {
           "name": "info",
@@ -1175,7 +1178,8 @@
           "name": "tile_metadata",
           "type": "STRING",
           "links": [
-            49
+            49,
+            53
           ]
         }
       ],
@@ -1225,7 +1229,8 @@
           "type": "IMAGE",
           "links": [
             50,
-            51
+            51,
+            54
           ]
         }
       ],
@@ -1306,6 +1311,64 @@
         "tiff",
         95,
         ""
+      ]
+    },
+    {
+      "id": 26,
+      "type": "TileCostReporterAM",
+      "pos": [
+        2500,
+        260
+      ],
+      "size": [
+        350,
+        400
+      ],
+      "flags": {},
+      "order": 26,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "tile_metadata",
+          "type": "STRING",
+          "link": 53
+        },
+        {
+          "name": "stitched_image",
+          "type": "IMAGE",
+          "link": 54
+        },
+        {
+          "name": "tile_count",
+          "type": "INT",
+          "link": 55
+        },
+        {
+          "name": "upscale_factor",
+          "shape": 7,
+          "type": "FLOAT",
+          "widget": {
+            "name": "upscale_factor"
+          },
+          "link": 56
+        }
+      ],
+      "outputs": [
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TileCostReporterAM"
+      },
+      "widgets_values": [
+        0.001,
+        "fal.ai / SeedVR2",
+        "false",
+        0.0,
+        0.0
       ]
     }
   ],
@@ -1724,6 +1787,38 @@
       0,
       23,
       4,
+      "FLOAT"
+    ],
+    [
+      53,
+      22,
+      3,
+      26,
+      0,
+      "STRING"
+    ],
+    [
+      54,
+      23,
+      0,
+      26,
+      1,
+      "IMAGE"
+    ],
+    [
+      55,
+      22,
+      1,
+      26,
+      2,
+      "INT"
+    ],
+    [
+      56,
+      3,
+      0,
+      26,
+      3,
       "FLOAT"
     ]
   ],

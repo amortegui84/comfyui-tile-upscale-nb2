@@ -1137,6 +1137,252 @@ class SaveImageWithDPI:
         return {"ui": {"images": results}, "result": (path, size_info)}
 
 
+# ── TileCostReporterAM ─────────────────────────────────────────────────────────
+
+class TileCostReporterAM:
+    """
+    Reports estimated API cost and timing for tiled upscale workflows.
+
+    Fal/SeedVR2 charges per output megapixel per API call.  In a tile workflow
+    each tile is a separate API call, so a 3×3 grid = 9 calls.  Overlap means
+    the total billed megapixels exceed the final stitched image megapixels.
+    """
+
+    CATEGORY = "AM/TileUpscale"
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("report",)
+    FUNCTION = "generate_report"
+    OUTPUT_NODE = True
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "tile_metadata": ("STRING", {"forceInput": True}),
+                "stitched_image": ("IMAGE",),
+                "tile_count": ("INT", {"default": 0, "min": 0, "max": 256, "forceInput": True}),
+            },
+            "optional": {
+                "upscale_factor": (
+                    "FLOAT",
+                    {
+                        "default": 0.0,
+                        "min": 0.0,
+                        "max": 16.0,
+                        "step": 0.1,
+                        "tooltip": "0 = infer from stitched image vs source dimensions.",
+                    },
+                ),
+                "price_per_megapixel": (
+                    "FLOAT",
+                    {
+                        "default": 0.001,
+                        "min": 0.0,
+                        "max": 10.0,
+                        "step": 0.0001,
+                        "tooltip": "Provider cost per output megapixel. Fal/SeedVR2 default is $0.001.",
+                    },
+                ),
+                "provider_name": (
+                    "STRING",
+                    {"default": "fal.ai / SeedVR2", "multiline": False},
+                ),
+                "include_server_estimate": (
+                    ["false", "true"],
+                    {
+                        "default": "false",
+                        "tooltip": "Include local server/GPU compute cost in the total estimate.",
+                    },
+                ),
+                "server_cost_per_hour_usd": (
+                    "FLOAT",
+                    {
+                        "default": 0.0,
+                        "min": 0.0,
+                        "max": 1000.0,
+                        "step": 0.01,
+                        "tooltip": "Your server/GPU cost per hour in USD.",
+                    },
+                ),
+                "elapsed_seconds": (
+                    "FLOAT",
+                    {
+                        "default": 0.0,
+                        "min": 0.0,
+                        "max": 86400.0,
+                        "step": 1.0,
+                        "tooltip": "Total generation time in seconds. 0 = not provided.",
+                    },
+                ),
+            },
+        }
+
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        return float("nan")
+
+    def generate_report(
+        self,
+        tile_metadata: str,
+        stitched_image: torch.Tensor,
+        tile_count: int,
+        upscale_factor: float = 0.0,
+        price_per_megapixel: float = 0.001,
+        provider_name: str = "fal.ai / SeedVR2",
+        include_server_estimate: str = "false",
+        server_cost_per_hour_usd: float = 0.0,
+        elapsed_seconds: float = 0.0,
+    ) -> dict:
+        include_server = include_server_estimate == "true"
+        warn: list[str] = []
+
+        # ── Parse metadata ──────────────────────────────────────────────────────
+        try:
+            meta = json.loads(tile_metadata)
+        except (json.JSONDecodeError, TypeError):
+            err = "ERROR: Could not parse tile_metadata JSON."
+            return {"ui": {"text": [err]}, "result": (err,)}
+
+        grid_cols: int = meta.get("grid_cols", 0)
+        grid_rows: int = meta.get("grid_rows", 0)
+        meta_tile_count: int = len(meta.get("tiles", []))
+        src_w: int = meta.get("src_w", 0)
+        uniform_tile_w: int = meta.get("uniform_tile_w", 0)
+        uniform_tile_h: int = meta.get("uniform_tile_h", 0)
+        overlap_pct: float = meta.get("overlap_pct", 0.0)
+
+        # ── Stitched image dimensions ──────────────────────────────────────────
+        # Tensor shape: [B, H, W, C]
+        _, stitch_h, stitch_w, _ = stitched_image.shape
+        final_mp = (stitch_w * stitch_h) / 1_000_000.0
+
+        # ── Resolve upscale factor ─────────────────────────────────────────────
+        upscale_inferred = False
+        if upscale_factor <= 0.0:
+            if src_w > 0 and stitch_w > 0:
+                upscale_factor = stitch_w / src_w
+                upscale_inferred = True
+            else:
+                upscale_factor = 1.0
+                warn.append("Could not infer upscale factor — defaulted to 1.0.")
+
+        # ── Tile count validation ─────────────────────────────────────────────
+        if meta_tile_count > 0 and tile_count != meta_tile_count:
+            warn.append(
+                f"tile_count ({tile_count}) differs from metadata grid count "
+                f"({meta_tile_count}). Using tile_count for cost."
+            )
+        effective_calls = tile_count if tile_count > 0 else meta_tile_count
+
+        # ── Per-tile billed megapixels ─────────────────────────────────────────
+        # Fal bills per OUTPUT megapixel per API call.
+        # Each tile output = source_tile_px × upscale_factor (per axis).
+        tile_size_note = "from metadata"
+        if uniform_tile_w > 0 and uniform_tile_h > 0:
+            proc_tile_w = int(uniform_tile_w * upscale_factor)
+            proc_tile_h = int(uniform_tile_h * upscale_factor)
+            mp_per_tile = (proc_tile_w * proc_tile_h) / 1_000_000.0
+        elif grid_cols > 0 and grid_rows > 0 and stitch_w > 0 and stitch_h > 0:
+            # Fallback: divide final image by grid without overlap correction.
+            mp_per_tile = final_mp / (grid_cols * grid_rows)
+            proc_tile_w = int(stitch_w / grid_cols)
+            proc_tile_h = int(stitch_h / grid_rows)
+            tile_size_note = "estimated (no tile dims in metadata)"
+            warn.append(
+                "Tile dimensions not in metadata — tile MP estimated from final "
+                "image size. Actual billed MP may be higher due to overlap."
+            )
+        else:
+            mp_per_tile = final_mp
+            proc_tile_w = stitch_w
+            proc_tile_h = stitch_h
+            tile_size_note = "estimated (fallback)"
+            warn.append("Could not determine tile dimensions — cost is approximate.")
+
+        total_billed_mp = mp_per_tile * effective_calls
+
+        # ── Validate price ───────────────────────────────────────────────────
+        if price_per_megapixel <= 0.0:
+            warn.append(
+                f"price_per_megapixel ({price_per_megapixel}) is invalid — using $0.001."
+            )
+            price_per_megapixel = 0.001
+
+        # ── Cost calculation ──────────────────────────────────────────────────
+        fal_cost = total_billed_mp * price_per_megapixel
+
+        server_cost = 0.0
+        if include_server and server_cost_per_hour_usd > 0.0 and elapsed_seconds > 0.0:
+            server_cost = (elapsed_seconds / 3600.0) * server_cost_per_hour_usd
+
+        total_cost = fal_cost + server_cost
+
+        # ── Build report ──────────────────────────────────────────────────────
+        sep = "─" * 50
+        uf_tag = f"{upscale_factor:.2f}x" + (" (inferred)" if upscale_inferred else "")
+        provider_short = provider_name.split("/")[0].strip()
+
+        lines: list[str] = [sep, "  Tile Cost & Runtime Report", sep]
+        lines += [
+            f"Final output:           {stitch_w} x {stitch_h} px",
+            f"Final megapixels:       {final_mp:.2f} MP",
+            f"Grid:                   {grid_cols} x {grid_rows}",
+            f"External calls:         {effective_calls}",
+            f"Upscale factor:         {uf_tag}",
+            f"Overlap:                {overlap_pct:.1f}%",
+            "",
+            f"Provider:               {provider_name}",
+            f"Price:                  ${price_per_megapixel:.4f} / MP",
+            "",
+            f"Tile size (source):     {uniform_tile_w} x {uniform_tile_h} px",
+            f"Tile size (processed):  {proc_tile_w} x {proc_tile_h} px  [{tile_size_note}]",
+            f"MP per tile (billed):   {mp_per_tile:.4f} MP",
+            f"Total billed MP:        {total_billed_mp:.4f} MP",
+            f"  = {mp_per_tile:.4f} MP/tile × {effective_calls} calls",
+            "",
+            f"Estimated {provider_short} cost:  ${fal_cost:.4f}",
+        ]
+
+        if include_server:
+            if server_cost > 0.0:
+                lines.append(
+                    f"Server compute est.:    ${server_cost:.4f}"
+                    f"  ({elapsed_seconds:.0f}s ÷ 3600 × ${server_cost_per_hour_usd:.2f}/hr)"
+                )
+            else:
+                lines.append("Server compute est.:    Not provided")
+
+        lines.append(f"Total estimated cost:   ${total_cost:.4f}")
+        lines.append("")
+
+        if elapsed_seconds > 0.0:
+            mins = int(elapsed_seconds // 60)
+            secs = elapsed_seconds - mins * 60
+            lines.append(f"Elapsed time:           {mins}m {secs:.1f}s ({elapsed_seconds:.1f}s total)")
+            if effective_calls > 0:
+                lines.append(f"Avg time / tile:        {elapsed_seconds / effective_calls:.1f}s")
+        else:
+            lines.append("Elapsed time:           Not provided")
+            lines.append("Avg time / tile:        Not provided")
+
+        if warn:
+            lines.append("")
+            lines.append("Warnings:")
+            for w in warn:
+                lines.append(f"  ! {w}")
+
+        lines += [
+            "",
+            "Note: Cost is based on processed tile outputs (including overlap),",
+            "      not only final stitched dimensions. Overlap increases billed MP.",
+            sep,
+        ]
+
+        report = "\n".join(lines)
+        print(f"[TileCostReporterAM]\n{report}")
+        return {"ui": {"text": [report]}, "result": (report,)}
+
+
 # ── ShowTextAM ─────────────────────────────────────────────────────────────────
 
 class ShowTextAM:
@@ -1179,6 +1425,7 @@ NODE_CLASS_MAPPINGS: dict[str, type] = {
     "TileInfoAM": TileInfoAM,
     "SaveImageWithDPI": SaveImageWithDPI,
     "ShowTextAM": ShowTextAM,
+    "TileCostReporterAM": TileCostReporterAM,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS: dict[str, str] = {
@@ -1191,4 +1438,5 @@ NODE_DISPLAY_NAME_MAPPINGS: dict[str, str] = {
     "TileInfoAM": "Tile Info / Debug (AM)",
     "ShowTextAM": "Show Text (AM)",
     "SaveImageWithDPI": "Save Image With DPI (AM)",
+    "TileCostReporterAM": "Tile Cost & Runtime Info (AM)",
 }
