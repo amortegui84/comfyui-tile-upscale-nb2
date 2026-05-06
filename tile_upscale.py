@@ -1318,7 +1318,7 @@ class TileCostReporterAM:
         total_cost = fal_cost + server_cost
 
         # ── Build report ──────────────────────────────────────────────────────
-        sep = "─" * 50
+        sep = "-" * 50
         uf_tag = f"{upscale_factor:.2f}x" + (" (inferred)" if upscale_inferred else "")
         provider_short = provider_name.split("/")[0].strip()
 
@@ -1338,7 +1338,7 @@ class TileCostReporterAM:
             f"Tile size (processed):  {proc_tile_w} x {proc_tile_h} px  [{tile_size_note}]",
             f"MP per tile (billed):   {mp_per_tile:.4f} MP",
             f"Total billed MP:        {total_billed_mp:.4f} MP",
-            f"  = {mp_per_tile:.4f} MP/tile × {effective_calls} calls",
+            f"  = {mp_per_tile:.4f} MP/tile x {effective_calls} calls",
             "",
             f"Estimated {provider_short} cost:  ${fal_cost:.4f}",
         ]
@@ -1347,7 +1347,7 @@ class TileCostReporterAM:
             if server_cost > 0.0:
                 lines.append(
                     f"Server compute est.:    ${server_cost:.4f}"
-                    f"  ({elapsed_seconds:.0f}s ÷ 3600 × ${server_cost_per_hour_usd:.2f}/hr)"
+                    f"  ({elapsed_seconds:.0f}s / 3600 x ${server_cost_per_hour_usd:.2f}/hr)"
                 )
             else:
                 lines.append("Server compute est.:    Not provided")
